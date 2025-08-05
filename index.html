@@ -1246,20 +1246,24 @@ function exportDrawio() {
     let xml = '<?xml version="1.0" encoding="UTF-8"?><mxfile><diagram name="Privilege Map"><mxGraphModel><root>';
     xml += '<mxCell id="0"/><mxCell id="1" parent="0"/>';
     let cellId = 2;
-    data.servers.forEach((s,si) => {
+
+    data.servers.forEach((s, si) => {
         const sid = cellId++;
-        xml += `<mxCell id="${sid}" value="${s.name}${s.os ? '\\n'+s.os : ''}${s.software ? '\\n'+s.software : ''}" style="shape=ellipse;fillColor=#8e44ad;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${si*200}" y="0" width="160" height="60" as="geometry"/></mxCell>`;
-        s.accounts.forEach((a,ai) => {
+        xml += `<mxCell id="${sid}" value="${s.name}${s.os ? '&#xa;'+s.os : ''}${s.software ? '&#xa;'+s.software : ''}" style="shape=ellipse;fillColor=#8e44ad;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${si*200}" y="0" width="160" height="60" as="geometry"/></mxCell>`;
+
+        s.accounts.forEach((a, ai) => {
             const aid = cellId++;
-            xml += `<mxCell id="${aid}" value="${a.name}${a.rights ? '\\n'+a.rights : ''}${a.typeAccess ? '\\n'+a.typeAccess : ''}${a.authMethod ? '\\n'+a.authMethod : ''}${a.typeAccount ? '\\n'+a.typeAccount : ''}" style="shape=ellipse;fillColor=#2980b9;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${si*200+ai*160}" y="150" width="160" height="60" as="geometry"/></mxCell>`;
+            xml += `<mxCell id="${aid}" value="${a.name}${a.rights ? '&#xa;'+a.rights : ''}${a.typeAccess ? '&#xa;'+a.typeAccess : ''}${a.authMethod ? '&#xa;'+a.authMethod : ''}${a.typeAccount ? '&#xa;'+a.typeAccount : ''}" style="shape=ellipse;fillColor=#2980b9;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${si*200+ai*160}" y="150" width="160" height="60" as="geometry"/></mxCell>`;
             xml += `<mxCell id="${cellId++}" edge="1" parent="1" source="${sid}" target="${aid}"><mxGeometry relative="1" as="geometry"/></mxCell>`;
-            a.identities.forEach((i,ii) => {
+
+            a.identities.forEach((i, ii) => {
                 const iid = cellId++;
-                xml += `<mxCell id="${iid}" value="${i.name}${i.role ? '\\n'+i.role : ''}${i.justification ? '\\n'+i.justification : ''}${i.lastReview ? '\\n'+i.lastReview : ''}${i.nextReview ? '\\n'+i.nextReview : ''}" style="shape=ellipse;fillColor=#27ae60;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${si*200+ai*160+ii*140}" y="300" width="160" height="60" as="geometry"/></mxCell>`;
+                xml += `<mxCell id="${iid}" value="${i.name}${i.role ? '&#xa;'+i.role : ''}${i.justification ? '&#xa;'+i.justification : ''}${i.lastReview ? '&#xa;'+i.lastReview : ''}${i.nextReview ? '&#xa;'+i.nextReview : ''}" style="shape=ellipse;fillColor=#27ae60;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${si*200+ai*160+ii*140}" y="300" width="160" height="60" as="geometry"/></mxCell>`;
                 xml += `<mxCell id="${cellId++}" edge="1" parent="1" source="${aid}" target="${iid}"><mxGeometry relative="1" as="geometry"/></mxCell>`;
             });
         });
     });
+
     xml += '</root></mxGraphModel></diagram></mxfile>';
     const blob = new Blob([xml], {type: 'application/xml'});
     const url = URL.createObjectURL(blob);
@@ -1271,6 +1275,7 @@ function exportDrawio() {
     updateConnectionIndicator('Export Draw.io réussi');
     setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
 }
+
 
 // geneerate svg
 function exportSVG() {
