@@ -1243,7 +1243,6 @@ document.getElementById('fileInput').addEventListener('change', e => {
 });
 
 function exportDrawio() {
-    // Helper to escape XML special characters
     const escapeXml = (unsafe) => {
         if (!unsafe) return '';
         return unsafe
@@ -1254,22 +1253,33 @@ function exportDrawio() {
             .replace(/'/g, '&apos;');
     };
 
+    // Layout settings
+    const serverSpacingX = 300;   // Space between servers
+    const accountSpacingY = 180;  // Vertical space between levels
+    const accountSpacingX = 220;  // Horizontal space between accounts
+    const identitySpacingX = 200; // Horizontal space between identities
+
     let xml = '<?xml version="1.0" encoding="UTF-8"?><mxfile><diagram name="Privilege Map"><mxGraphModel><root>';
     xml += '<mxCell id="0"/><mxCell id="1" parent="0"/>';
     let cellId = 2;
 
     data.servers.forEach((s, si) => {
+        const serverX = si * serverSpacingX;
         const sid = cellId++;
-        xml += `<mxCell id="${sid}" value="${escapeXml(s.name)}${s.os ? '&#xa;' + escapeXml(s.os) : ''}${s.software ? '&#xa;' + escapeXml(s.software) : ''}" style="shape=ellipse;fillColor=#8e44ad;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${si*200}" y="0" width="160" height="60" as="geometry"/></mxCell>`;
+        xml += `<mxCell id="${sid}" value="${escapeXml(s.name)}${s.os ? '&#xa;' + escapeXml(s.os) : ''}${s.software ? '&#xa;' + escapeXml(s.software) : ''}" style="shape=ellipse;fillColor=#8e44ad;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${serverX}" y="0" width="160" height="60" as="geometry"/></mxCell>`;
 
         s.accounts.forEach((a, ai) => {
+            const accountX = serverX + ai * accountSpacingX;
+            const accountY = accountSpacingY;
             const aid = cellId++;
-            xml += `<mxCell id="${aid}" value="${escapeXml(a.name)}${a.rights ? '&#xa;' + escapeXml(a.rights) : ''}${a.typeAccess ? '&#xa;' + escapeXml(a.typeAccess) : ''}${a.authMethod ? '&#xa;' + escapeXml(a.authMethod) : ''}${a.typeAccount ? '&#xa;' + escapeXml(a.typeAccount) : ''}" style="shape=ellipse;fillColor=#2980b9;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${si*200+ai*160}" y="150" width="160" height="60" as="geometry"/></mxCell>`;
+            xml += `<mxCell id="${aid}" value="${escapeXml(a.name)}${a.rights ? '&#xa;' + escapeXml(a.rights) : ''}${a.typeAccess ? '&#xa;' + escapeXml(a.typeAccess) : ''}${a.authMethod ? '&#xa;' + escapeXml(a.authMethod) : ''}${a.typeAccount ? '&#xa;' + escapeXml(a.typeAccount) : ''}" style="shape=ellipse;fillColor=#2980b9;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${accountX}" y="${accountY}" width="160" height="60" as="geometry"/></mxCell>`;
             xml += `<mxCell id="${cellId++}" edge="1" parent="1" source="${sid}" target="${aid}"><mxGeometry relative="1" as="geometry"/></mxCell>`;
 
             a.identities.forEach((i, ii) => {
+                const identityX = accountX + ii * identitySpacingX;
+                const identityY = accountSpacingY * 2;
                 const iid = cellId++;
-                xml += `<mxCell id="${iid}" value="${escapeXml(i.name)}${i.role ? '&#xa;' + escapeXml(i.role) : ''}${i.justification ? '&#xa;' + escapeXml(i.justification) : ''}${i.lastReview ? '&#xa;' + escapeXml(i.lastReview) : ''}${i.nextReview ? '&#xa;' + escapeXml(i.nextReview) : ''}" style="shape=ellipse;fillColor=#27ae60;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${si*200+ai*160+ii*140}" y="300" width="160" height="60" as="geometry"/></mxCell>`;
+                xml += `<mxCell id="${iid}" value="${escapeXml(i.name)}${i.role ? '&#xa;' + escapeXml(i.role) : ''}${i.justification ? '&#xa;' + escapeXml(i.justification) : ''}${i.lastReview ? '&#xa;' + escapeXml(i.lastReview) : ''}${i.nextReview ? '&#xa;' + escapeXml(i.nextReview) : ''}" style="shape=ellipse;fillColor=#27ae60;fontColor=#FFFFFF;" vertex="1" parent="1"><mxGeometry x="${identityX}" y="${identityY}" width="160" height="60" as="geometry"/></mxCell>`;
                 xml += `<mxCell id="${cellId++}" edge="1" parent="1" source="${aid}" target="${iid}"><mxGeometry relative="1" as="geometry"/></mxCell>`;
             });
         });
@@ -1288,6 +1298,7 @@ function exportDrawio() {
     updateConnectionIndicator('Export Draw.io réussi');
     setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
 }
+
 
 
 
