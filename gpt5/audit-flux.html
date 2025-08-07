@@ -32,7 +32,7 @@ body {
 header {
     background: var(--primary);
     color: white;
-    padding: 1rem;
+    padding: 0.8rem 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -41,36 +41,38 @@ header {
     z-index: 100;
 }
 header h1 {
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
 }
 .toolbar {
     display: flex;
-    gap: 0.5rem;
+    gap: 0.4rem;
     flex-wrap: wrap;
 }
 .btn {
     background: var(--primary);
     color: white;
     border: none;
-    padding: 0.5rem 0.8rem;
+    padding: 0.4rem 0.7rem;
     border-radius: 6px;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     display: flex;
     align-items: center;
     gap: 0.3rem;
 }
-.btn:hover {
-    background: var(--primary-dark);
-}
+.btn:hover { background: var(--primary-dark); }
 .btn-secondary { background: var(--gray); }
 .btn-danger { background: var(--danger); }
 .btn-success { background: var(--success); }
 .search-box {
-    padding: 0.4rem;
+    padding: 0.3rem;
     border: 1px solid var(--border);
     border-radius: 6px;
+    font-size: 0.8rem;
 }
 main {
     padding: 1rem;
@@ -108,7 +110,7 @@ tr:nth-child(even) {
 </head>
 <body>
 <header>
-    <h1>🌐 Audit Flux Réseaux ISO 27001</h1>
+    <h1><i class="fa fa-network-wired"></i> Audit Flux Réseaux ISO 27001</h1>
     <div class="toolbar">
         <button class="btn btn-success" onclick="openAddFlowModal()"><i class="fa fa-plus"></i> Flux</button>
         <button class="btn btn-secondary" onclick="exportJSON()"><i class="fa fa-download"></i> JSON</button>
@@ -195,9 +197,10 @@ function exportExcel() {
 function generateAuditPDF() {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
-    doc.text("Audit Flux Réseaux ISO 27001", 10, 10);
+    doc.setFontSize(16);
+    doc.text("Audit Flux Réseaux ISO 27001", 20, 20);
     flows.forEach((f, i) => {
-        doc.text(`${i+1}. ${f.name} - ${f.protocol} - ${f.source} -> ${f.dest} - ${f.risk}`, 10, 20 + i*10);
+        doc.text(`${i+1}. ${f.name} - ${f.protocol} - ${f.source} -> ${f.dest} - ${f.risk}`, 20, 30 + i*10);
     });
     doc.save("audit-flux.pdf");
 }
