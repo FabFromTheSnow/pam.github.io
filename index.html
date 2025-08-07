@@ -675,6 +675,21 @@
         </div>
 
         <!-- Controls -->
+        <!-- Pagination Controls -->
+        <div class="controls-section">
+            <h3>📄 Pagination</h3>
+            <div class="control-group">
+                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+                    <button id="prevPageBtn" class="btn btn-secondary" onclick="changePage(-1)" style="flex: 1;">◀ Prec</button>
+                    <span id="pageInfo" style="font-weight: 600; color: var(--primary);">1/1</span>
+                    <button id="nextPageBtn" class="btn btn-secondary" onclick="changePage(1)" style="flex: 1;">Suiv ▶</button>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--gray); text-align: center;">
+                    <span id="pageElementCount">0 serveurs affichés</span>
+                </div>
+            </div>
+        </div>
+        
         <div class="controls-section">
             <h3>🎛️ Contrôles rapides</h3>
             <div class="control-group">
@@ -933,11 +948,28 @@ let data = {
 };
 const svg = document.getElementById('svgCanvas');
 
+// Gestionnaire de clic sur zone vide pour ajout rapide
+svg.addEventListener('click', (e) => {
+    // Vérifier que ce n'est pas un clic sur un élément existant
+    if (e.target === svg) {
+        const rect = svg.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        showEmptyAreaContextMenu(x, y);
+    }
+});
+
 // Variables pour les nouvelles fonctionnalités
 let sidebarCollapsed = false;
 
+// Variables de pagination
+let currentPage = 1;
+let serversPerPage = 6; // Nombre de serveurs par page
+let maxTotalPages = 1;
+
 // ==== Fonctions modales et ajout (JavaScript original conservé) ====
 function openAddServerModal() {
+    currentServerId = null; // Reset pour mode ajout
     document.getElementById('serverName').value = "";
     populateSelect('serverOS', data.settings.osList, true);
     populateSelect('serverSoftware', data.settings.softwareList, true);
@@ -946,25 +978,55 @@ function openAddServerModal() {
 }
 
 function confirmAddServer() {
-    const server = {
-        id: Date.now(),
-        name: document.getElementById('serverName').value.trim(),
-        os: document.getElementById('serverOS').value || "",
-        software: document.getElementById('serverSoftware').value || "",
-        accounts: []
-    };
-    if (!server.name) return alert("Nom requis");
-    data.servers.push(server);
-    closeModal('serverModal');
-    render();
-    updateStats();
-    updateConnectionIndicator(`Serveur "${server.name}" ajouté`);
-    setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
+    if (currentServerId && data.servers.find(s => s.id === currentServerId)) {
+        // Mode modification
+        const server = data.servers.find(s => s.id === currentServerId);
+        const oldValues = { os: server.os, software: server.software };
+        
+        server.name = document.getElementById('serverName').value.trim();
+        server.os = document.getElementById('serverOS').value || "";
+        server.software = document.getElementById('serverSoftware').value || "";
+        
+        if (!server.name) return alert("Nom requis");
+        
+        // Mettre à jour les listes si nécessaire
+        updateListsFromChanges('serverOS', oldValues.os, server.os);
+        updateListsFromChanges('serverSoftware', oldValues.software, server.software);
+        
+        closeModal('serverModal');
+        render();
+        updateStats();
+        updateConnectionIndicator(`Serveur "${server.name}" modifié`);
+        setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
+        currentServerId = null;
+    } else {
+        // Mode ajout
+        const server = {
+            id: Date.now(),
+            name: document.getElementById('serverName').value.trim(),
+            os: document.getElementById('serverOS').value || "",
+            software: document.getElementById('serverSoftware').value || "",
+            accounts: []
+        };
+        if (!server.name) return alert("Nom requis");
+        
+        // Mettre à jour les listes si nécessaire
+        updateListsFromChanges('serverOS', null, server.os);
+        updateListsFromChanges('serverSoftware', null, server.software);
+        
+        data.servers.push(server);
+        closeModal('serverModal');
+        render();
+        updateStats();
+        updateConnectionIndicator(`Serveur "${server.name}" ajouté`);
+        setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
+    }
 }
 
 let currentServerId = null;
 function openAddAccountModal(serverId) {
     currentServerId = serverId;
+    currentAccountId = null; // Reset pour mode ajout
     document.getElementById('accountName').value = "";
     document.getElementById('accountRights').value = "";
     populateSelect('accountTypeAccess', data.settings.typeAccessList, true);
@@ -976,28 +1038,120 @@ function openAddAccountModal(serverId) {
 
 function confirmAddAccount() {
     const server = data.servers.find(s => s.id === currentServerId);
-    const account = {
-        id: Date.now(),
-        name: document.getElementById('accountName').value.trim(),
-        rights: document.getElementById('accountRights').value.trim(),
-        typeAccess: document.getElementById('accountTypeAccess').value || "",
-        authMethod: document.getElementById('accountAuthMethod').value || "",
-        typeAccount: document.getElementById('accountType').value || "",
-        identities: []
-    };
-    if (!account.name) return alert("Nom requis");
-    server.accounts.push(account);
-    closeModal('accountModal');
-    render();
-    updateStats();
-    updateConnectionIndicator(`Compte "${account.name}" ajouté`);
-    setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
+    
+    if (currentAccountId && server.accounts.find(a => a.id === currentAccountId)) {
+        // Mode modification
+        const account = server.accounts.find(a => a.id === currentAccountId);
+        const oldValues = {
+            typeAccess: account.typeAccess,
+            authMethod: account.authMethod,
+            typeAccount: account.typeAccount
+        };
+        
+        account.name = document.getElementById('accountName').value.trim();
+        account.rights = document.getElementById('accountRights').value.trim();
+        account.typeAccess = document.getElementById('accountTypeAccess').value || "";
+        account.authMethod = document.getElementById('accountAuthMethod').value || "";
+        account.typeAccount = document.getElementById('accountType').value || "";
+        
+        if (!account.name) return alert("Nom requis");
+        
+        // Mettre à jour les listes si nécessaire
+        updateListsFromChanges('accountTypeAccess', oldValues.typeAccess, account.typeAccess);
+        updateListsFromChanges('accountAuthMethod', oldValues.authMethod, account.authMethod);
+        updateListsFromChanges('accountType', oldValues.typeAccount, account.typeAccount);
+        
+        closeModal('accountModal');
+        render();
+        updateStats();
+        updateConnectionIndicator(`Compte "${account.name}" modifié`);
+        setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
+        currentAccountId = null;
+    } else {
+        // Mode ajout
+        const account = {
+            id: Date.now(),
+            name: document.getElementById('accountName').value.trim(),
+            rights: document.getElementById('accountRights').value.trim(),
+            typeAccess: document.getElementById('accountTypeAccess').value || "",
+            authMethod: document.getElementById('accountAuthMethod').value || "",
+            typeAccount: document.getElementById('accountType').value || "",
+            identities: []
+        };
+        if (!account.name) return alert("Nom requis");
+        
+        // Mettre à jour les listes si nécessaire
+        updateListsFromChanges('accountTypeAccess', null, account.typeAccess);
+        updateListsFromChanges('accountAuthMethod', null, account.authMethod);
+        updateListsFromChanges('accountType', null, account.typeAccount);
+        
+        server.accounts.push(account);
+        closeModal('accountModal');
+        render();
+        updateStats();
+        updateConnectionIndicator(`Compte "${account.name}" ajouté`);
+        setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
+    }
 }
 
 let currentAccountId = null;
+let currentIdentityId = null;
+
+// ==== FONCTIONS DE MODIFICATION ====
+function openEditServerModal(serverId) {
+    const server = data.servers.find(s => s.id === serverId);
+    if (!server) return;
+    
+    document.getElementById('serverName').value = server.name;
+    populateSelect('serverOS', data.settings.osList, true, server.os);
+    populateSelect('serverSoftware', data.settings.softwareList, true, server.software);
+    
+    currentServerId = serverId;
+    document.getElementById('serverModal').style.display = 'flex';
+    updateConnectionIndicator('Modification serveur...');
+}
+
+function openEditAccountModal(serverId, accountId) {
+    const server = data.servers.find(s => s.id === serverId);
+    const account = server.accounts.find(a => a.id === accountId);
+    if (!account) return;
+    
+    currentServerId = serverId;
+    currentAccountId = accountId;
+    
+    document.getElementById('accountName').value = account.name;
+    document.getElementById('accountRights').value = account.rights;
+    populateSelect('accountTypeAccess', data.settings.typeAccessList, true, account.typeAccess);
+    populateSelect('accountAuthMethod', data.settings.authMethodList, true, account.authMethod);
+    populateSelect('accountType', data.settings.typeAccountList, true, account.typeAccount);
+    
+    document.getElementById('accountModal').style.display = 'flex';
+    updateConnectionIndicator('Modification compte...');
+}
+
+function openEditIdentityModal(serverId, accountId, identityId) {
+    const server = data.servers.find(s => s.id === serverId);
+    const account = server.accounts.find(a => a.id === accountId);
+    const identity = account.identities.find(i => i.id === identityId);
+    if (!identity) return;
+    
+    currentServerId = serverId;
+    currentAccountId = accountId;
+    currentIdentityId = identityId;
+    
+    document.getElementById('identityName').value = identity.name;
+    populateSelect('identityRole', data.settings.roleList, true, identity.role);
+    populateSelect('identityJustification', data.settings.justificationList, true, identity.justification);
+    document.getElementById('identityLastReview').value = identity.lastReview;
+    document.getElementById('identityNextReview').value = identity.nextReview;
+    
+    document.getElementById('identityModal').style.display = 'flex';
+    updateConnectionIndicator('Modification identité...');
+}
 function openAddIdentityModal(serverId, accountId) {
     currentServerId = serverId;
     currentAccountId = accountId;
+    currentIdentityId = null; // Reset pour mode ajout
     document.getElementById('identityName').value = "";
     populateSelect('identityRole', data.settings.roleList, true);
     populateSelect('identityJustification', data.settings.justificationList, true);
@@ -1010,21 +1164,56 @@ function openAddIdentityModal(serverId, accountId) {
 function confirmAddIdentity() {
     const server = data.servers.find(s => s.id === currentServerId);
     const account = server.accounts.find(a => a.id === currentAccountId);
-    const identity = {
-        id: Date.now(),
-        name: document.getElementById('identityName').value.trim(),
-        role: document.getElementById('identityRole').value || "",
-        justification: document.getElementById('identityJustification').value || "",
-        lastReview: document.getElementById('identityLastReview').value || "",
-        nextReview: document.getElementById('identityNextReview').value || ""
-    };
-    if (!identity.name) return alert("Nom requis");
-    account.identities.push(identity);
-    closeModal('identityModal');
-    render();
-    updateStats();
-    updateConnectionIndicator(`Identité "${identity.name}" ajoutée`);
-    setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
+    
+    if (currentIdentityId && account.identities.find(i => i.id === currentIdentityId)) {
+        // Mode modification
+        const identity = account.identities.find(i => i.id === currentIdentityId);
+        const oldValues = {
+            role: identity.role,
+            justification: identity.justification
+        };
+        
+        identity.name = document.getElementById('identityName').value.trim();
+        identity.role = document.getElementById('identityRole').value || "";
+        identity.justification = document.getElementById('identityJustification').value || "";
+        identity.lastReview = document.getElementById('identityLastReview').value || "";
+        identity.nextReview = document.getElementById('identityNextReview').value || "";
+        
+        if (!identity.name) return alert("Nom requis");
+        
+        // Mettre à jour les listes si nécessaire
+        updateListsFromChanges('identityRole', oldValues.role, identity.role);
+        updateListsFromChanges('identityJustification', oldValues.justification, identity.justification);
+        
+        closeModal('identityModal');
+        render();
+        updateStats();
+        updateConnectionIndicator(`Identité "${identity.name}" modifiée`);
+        setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
+        currentIdentityId = null;
+    } else {
+        // Mode ajout
+        const identity = {
+            id: Date.now(),
+            name: document.getElementById('identityName').value.trim(),
+            role: document.getElementById('identityRole').value || "",
+            justification: document.getElementById('identityJustification').value || "",
+            lastReview: document.getElementById('identityLastReview').value || "",
+            nextReview: document.getElementById('identityNextReview').value || ""
+        };
+        if (!identity.name) return alert("Nom requis");
+        
+        // Mettre à jour les listes si nécessaire
+        updateListsFromChanges('identityRole', null, identity.role);
+        updateListsFromChanges('identityJustification', null, identity.justification);
+        
+        account.identities.push(identity);
+        closeModal('identityModal');
+        render();
+        updateStats();
+        updateConnectionIndicator(`Identité "${identity.name}" ajoutée`);
+        setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
+    }
 }
 
 // ==== Listes ====
@@ -1047,9 +1236,73 @@ function saveLists() {
     data.settings.typeAccountList = splitList('typeAccountListEdit');
     data.settings.roleList = splitList('roleListEdit');
     data.settings.justificationList = splitList('justificationListEdit');
+    
+    // Synchroniser avec les éléments existants
+    syncListChanges();
+    
     closeModal('listsModal');
     updateConnectionIndicator('Listes mises à jour');
     setTimeout(() => updateConnectionIndicator('✓ Prêt'), 2000);
+}
+
+// ==== SYSTÈME DE LIAISON DES LISTES ====
+function updateListsFromChanges(fieldType, oldValue, newValue) {
+    if (!newValue || newValue.trim() === '') return;
+    
+    const trimmedValue = newValue.trim();
+    
+    // Mapping des types de champs vers les listes
+    const fieldToListMap = {
+        'serverOS': 'osList',
+        'serverSoftware': 'softwareList',
+        'accountTypeAccess': 'typeAccessList',
+        'accountAuthMethod': 'authMethodList',
+        'accountType': 'typeAccountList',
+        'identityRole': 'roleList',
+        'identityJustification': 'justificationList'
+    };
+    
+    const listName = fieldToListMap[fieldType];
+    if (!listName || !data.settings[listName]) return;
+    
+    // Ajouter la nouvelle valeur si elle n'existe pas déjà
+    if (!data.settings[listName].includes(trimmedValue)) {
+        data.settings[listName].push(trimmedValue);
+        console.log(`Ajout de "${trimmedValue}" à la liste ${listName}`);
+    }
+}
+
+// Fonction pour synchroniser les changements de liste avec les éléments existants
+function syncListChanges() {
+    data.servers.forEach(server => {
+        if (server.os && !data.settings.osList.includes(server.os)) {
+            data.settings.osList.push(server.os);
+        }
+        if (server.software && !data.settings.softwareList.includes(server.software)) {
+            data.settings.softwareList.push(server.software);
+        }
+        
+        server.accounts.forEach(account => {
+            if (account.typeAccess && !data.settings.typeAccessList.includes(account.typeAccess)) {
+                data.settings.typeAccessList.push(account.typeAccess);
+            }
+            if (account.authMethod && !data.settings.authMethodList.includes(account.authMethod)) {
+                data.settings.authMethodList.push(account.authMethod);
+            }
+            if (account.typeAccount && !data.settings.typeAccountList.includes(account.typeAccount)) {
+                data.settings.typeAccountList.push(account.typeAccount);
+            }
+            
+            account.identities.forEach(identity => {
+                if (identity.role && !data.settings.roleList.includes(identity.role)) {
+                    data.settings.roleList.push(identity.role);
+                }
+                if (identity.justification && !data.settings.justificationList.includes(identity.justification)) {
+                    data.settings.justificationList.push(identity.justification);
+                }
+            });
+        });
+    });
 }
 
 function splitList(id) {
@@ -1080,14 +1333,17 @@ function closeModal(id) {
     document.getElementById(id).style.display = 'none'; 
 }
 
-function populateSelect(id, items, addEmpty) {
+function populateSelect(id, items, addEmpty, selectedValue) {
     const sel = document.getElementById(id);
     sel.innerHTML = "";
     if (addEmpty) sel.innerHTML += '<option value="">-- Aucun --</option>';
-    items.forEach(item => sel.innerHTML += `<option value="${item}">${item}</option>`);
+    items.forEach(item => {
+        const selected = selectedValue === item ? ' selected' : '';
+        sel.innerHTML += `<option value="${item}"${selected}>${item}</option>`;
+    });
 }
 
-// ==== Rendu (JavaScript original conservé) ====
+// ==== Rendu avec pagination et flèches en T ====
 function render() {
     svg.innerHTML = `
         <defs>
@@ -1103,57 +1359,278 @@ function render() {
                 <stop offset="0%" style="stop-color:#2ecc71;stop-opacity:1" />
                 <stop offset="100%" style="stop-color:#27ae60;stop-opacity:1" />
             </linearGradient>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" 
+                    refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#333" />
+            </marker>
         </defs>
     `;
     
-    const hGap = 180, vGap = 130;
-    const calcWidth = node => {
-        if (node.identities) return Math.max(1, node.identities.length) * hGap;
-        if (node.accounts) return node.accounts.reduce((sum,a) => sum + calcWidth(a), 0) || hGap;
-        return hGap;
-    };
-    let xCursor = 0;
-    data.servers.forEach(server => {
-        const branchW = calcWidth(server);
-        const sX = xCursor + branchW/2, sY = 50;
-        let label = server.name;
-        if (server.os) label += `\n${server.os}`;
-        if (server.software) label += `\n${server.software}`;
-        drawNode(sX, sY, label, 'server', () => openAddAccountModal(server.id), () => deleteNode('server', server.id));
-        let accX = xCursor;
-        server.accounts.forEach(account => {
-            const accW = calcWidth(account);
-            const aX = accX + accW/2, aY = sY + vGap;
-            drawLine(sX, sY+20, aX, aY-20, '#8e44ad');
-            let accLabel = `${account.name}`;
-            if (account.rights) accLabel += `\n${account.rights}`;
-            if (account.typeAccess) accLabel += `\n${account.typeAccess}`;
-            if (account.authMethod) accLabel += `\n${account.authMethod}`;
-            if (account.typeAccount) accLabel += `\n${account.typeAccount}`;
-            drawNode(aX, aY, accLabel, 'account', () => openAddIdentityModal(server.id, account.id), () => deleteNode('account', server.id, account.id));
-            let idX = accX;
-            account.identities.forEach(identity => {
-                const iX = idX + hGap/2, iY = aY + vGap;
-                drawLine(aX, aY+20, iX, iY-20, '#27ae60');
-                let idLabel = `${identity.name}`;
-                if (identity.role) idLabel += `\n${identity.role}`;
-                if (identity.justification) idLabel += `\n${identity.justification}`;
-                if (identity.lastReview) idLabel += `\nDernière: ${identity.lastReview}`;
-                if (identity.nextReview) idLabel += `\nProchaine: ${identity.nextReview}`;
-                drawNode(iX, iY, idLabel, 'identity', null, () => deleteNode('identity', server.id, account.id, identity.id));
-                idX += hGap;
-            });
-            accX += accW;
+    // Calculer la pagination
+    const totalServers = data.servers.length;
+    maxTotalPages = Math.max(1, Math.ceil(totalServers / serversPerPage));
+    
+    // Ajuster la page actuelle si nécessaire
+    if (currentPage > maxTotalPages) {
+        currentPage = maxTotalPages;
+    }
+    
+    // Obtenir les serveurs à afficher pour la page actuelle
+    const startIndex = (currentPage - 1) * serversPerPage;
+    const endIndex = Math.min(startIndex + serversPerPage, totalServers);
+    const serversToRender = data.servers.slice(startIndex, endIndex);
+    
+    // Mise à jour des contrôles de pagination
+    updatePaginationControls(serversToRender.length);
+    
+    // Calculs pour l'espacement amélioré
+    const serverSpacing = 120; // Espacement horizontal entre serveurs
+    const levelSpacing = 170;  // Espacement vertical entre niveaux augmenté
+    const accountSpacing = 240; // Espacement horizontal entre comptes
+    const identitySpacing = 280; // Espacement horizontal entre identités augmenté
+    
+    // Calcul optimisé de la largeur basé sur le contenu réel
+    const calcRequiredWidth = (accounts) => {
+        if (accounts.length === 0) return 500;
+        
+        // Dimensions et espacements standardisés  
+        const elementWidth = 320; // Largeur maximale des identités
+        const minElementSpacing = 60; // Espacement minimum entre bords des éléments
+        
+        // Largeur nécessaire pour les comptes
+        const accountsWidth = accounts.length * elementWidth + (accounts.length - 1) * minElementSpacing;
+        
+        // Largeur nécessaire pour le niveau identités le plus large
+        let maxIdentitiesWidth = 0;
+        accounts.forEach(account => {
+            if (account.identities.length > 0) {
+                const identitiesWidth = account.identities.length * elementWidth + 
+                    (account.identities.length - 1) * minElementSpacing;
+                maxIdentitiesWidth = Math.max(maxIdentitiesWidth, identitiesWidth);
+            }
         });
-        xCursor += branchW + hGap;
+        
+        // Largeur totale = la plus grande entre comptes et identités + marges
+        const totalWidth = Math.max(elementWidth, accountsWidth, maxIdentitiesWidth) + 200;
+        return totalWidth;
+    };
+    
+    let serverXPosition = 60; // Position de départ
+    
+    serversToRender.forEach((server, serverIndex) => {
+        const serverY = 80;
+        
+        // Initialiser le suivi des positions des identités pour ce serveur
+        const serverIdentityPositions = [];
+        
+        // Calculer la largeur nécessaire pour ce serveur
+        const requiredWidth = calcRequiredWidth(server.accounts);
+        const serverX = serverXPosition + requiredWidth / 2;
+        
+        // Note: Le serveur sera dessiné après le calcul de sa position centrée
+        
+        // Position des comptes
+        const accountY = serverY + levelSpacing;
+        const accountsStartX = serverXPosition;
+        
+        // Système de positionnement intelligent pour éviter les chevauchements
+        const elementWidth = 320; // Largeur maximale des identités pour éviter les superpositions
+        const minSpacing = 60; // Espacement minimum entre bords des éléments
+        
+        
+        // === PHASE 1: CALCULER TOUTES LES POSITIONS D'IDENTITÉS ===
+        const allIdentityPositions = new Map(); // Map<accountIndex, positions[]>
+        let globalIdentityX = serverXPosition + elementWidth; // Commencer après la zone du serveur
+        
+        server.accounts.forEach((account, accountIndex) => {
+            const identityCount = account.identities.length;
+            const positions = [];
+            
+            if (identityCount > 0) {
+                // Calculer les positions pour ce compte en évitant les collisions globales
+                for (let i = 0; i < identityCount; i++) {
+                    // Vérifier les collisions avec toutes les identités déjà positionnées
+                    let proposedX = globalIdentityX;
+                    let hasCollision = true;
+                    
+                    while (hasCollision) {
+                        hasCollision = false;
+                        
+                        // Vérifier contre toutes les identités des comptes précédents
+                        for (const [prevAccountIndex, prevPositions] of allIdentityPositions) {
+                            for (const existingX of prevPositions) {
+                                if (Math.abs(proposedX - existingX) < elementWidth + minSpacing) {
+                                    proposedX = existingX + elementWidth + minSpacing;
+                                    hasCollision = true;
+                                    break;
+                                }
+                            }
+                            if (hasCollision) break;
+                        }
+                        
+                        // Vérifier contre les identités déjà positionnées dans ce compte
+                        for (const existingX of positions) {
+                            if (Math.abs(proposedX - existingX) < elementWidth + minSpacing) {
+                                proposedX = existingX + elementWidth + minSpacing;
+                                hasCollision = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    positions.push(proposedX);
+                    globalIdentityX = Math.max(globalIdentityX, proposedX + elementWidth + minSpacing);
+                }
+            }
+            
+            allIdentityPositions.set(accountIndex, positions);
+            
+            // Ajouter un espacement supplémentaire entre les groupes de comptes
+            if (positions.length > 0) {
+                const accountSpacingExtra = 80; // Espacement supplémentaire entre comptes augmenté
+                globalIdentityX += accountSpacingExtra;
+            }
+        });
+
+        // === PHASE 1.5: CALCULER LES POSITIONS DES COMPTES BASÉES SUR LEURS IDENTITÉS ===
+        const accountPositions = [];
+        server.accounts.forEach((account, accountIndex) => {
+            const identityPositions = allIdentityPositions.get(accountIndex);
+            
+            if (identityPositions && identityPositions.length > 0) {
+                // Positionner le compte au centre de ses identités
+                const leftmostIdentity = Math.min(...identityPositions);
+                const rightmostIdentity = Math.max(...identityPositions);
+                const accountX = (leftmostIdentity + rightmostIdentity) / 2;
+                accountPositions[accountIndex] = accountX;
+            } else {
+                // Si pas d'identités, positionner le compte avec espacement supplémentaire
+                const previousAccountX = accountPositions.length > 0 ? 
+                    Math.max(...accountPositions.filter(x => x !== undefined)) : serverXPosition;
+                const accountSpacingExtra = 140; // Espacement plus large pour comptes sans identités
+                const defaultX = previousAccountX + elementWidth + minSpacing + accountSpacingExtra;
+                accountPositions[accountIndex] = defaultX;
+            }
+        });
+
+        // === PHASE 1.6: AJUSTER LA POSITION DU SERVEUR ===
+        let serverCenterX = serverX; // Position par défaut
+        if (accountPositions.length > 0) {
+            // Centrer le serveur par rapport à tous ses comptes
+            const leftmostAccount = Math.min(...accountPositions);
+            const rightmostAccount = Math.max(...accountPositions);
+            serverCenterX = (leftmostAccount + rightmostAccount) / 2;
+        }
+
+        // === PHASE 2: RENDU DU SERVEUR (MAINTENANT CENTRÉ) ===
+        let serverLabel = server.name;
+        if (server.os) serverLabel += `\n${server.os}`;
+        if (server.software) serverLabel += `\n${server.software}`;
+        
+        drawNode(serverCenterX, serverY, serverLabel, 'server', 
+                () => showContextMenu('server', server.id, null, null, serverCenterX, serverY), 
+                () => deleteNode('server', server.id));
+
+        // === PHASE 2.5: DESSINER LES CONNEXIONS VERS LES COMPTES ===
+        if (server.accounts.length > 0) {
+            // Ligne verticale principale du serveur (tige du T) - plus longue
+            const tJunctionY = accountY - 70; // Augmenté de 50 à 70
+            drawStraightLine(serverCenterX, serverY + 35, serverCenterX, tJunctionY, '#8e44ad');
+            
+            // Ligne horizontale principale (barre du T) si plusieurs comptes
+            if (server.accounts.length > 1) {
+                const leftmostX = Math.min(...accountPositions);
+                const rightmostX = Math.max(...accountPositions);
+                drawStraightLine(leftmostX, tJunctionY, rightmostX, tJunctionY, '#8e44ad');
+            }
+            
+            // Lignes verticales vers chaque compte - plus longues
+            server.accounts.forEach((account, accountIndex) => {
+                const accountX = accountPositions[accountIndex];
+                drawStraightLine(accountX, tJunctionY, accountX, accountY - 40, '#8e44ad'); // Plus long
+            });
+        }
+
+        // === PHASE 3: RENDU DES COMPTES ET IDENTITÉS ===
+        server.accounts.forEach((account, accountIndex) => {
+            const accountX = accountPositions[accountIndex];
+            
+            // Dessiner le compte
+            let accountLabel = account.name;
+            if (account.rights) accountLabel += `\n${account.rights}`;
+            if (account.typeAccess) accountLabel += `\n${account.typeAccess}`;
+            if (account.authMethod) accountLabel += `\n${account.authMethod}`;
+            if (account.typeAccount) accountLabel += `\n${account.typeAccount}`;
+            
+            drawNode(accountX, accountY, accountLabel, 'account',
+                    () => showContextMenu('account', server.id, account.id, null, accountX, accountY),
+                    () => deleteNode('account', server.id, account.id));
+            
+            // Position des identités avec espacement amélioré
+            const identityY = accountY + levelSpacing;
+            
+            const identityPositions = allIdentityPositions.get(accountIndex);
+            if (identityPositions && identityPositions.length > 0) {
+                // Ligne verticale principale du compte vers les identités (tige du T)
+                const identityTJunctionY = identityY - 70;
+                drawStraightLine(accountX, accountY + 35, accountX, identityTJunctionY, '#2980b9');
+                
+                // Calculer les extrêmes pour la ligne horizontale
+                const leftmostX = Math.min(...identityPositions);
+                const rightmostX = Math.max(...identityPositions);
+                
+                // Dessiner la ligne horizontale (barre du T) si plusieurs identités
+                if (identityPositions.length > 1) {
+                    drawStraightLine(leftmostX, identityTJunctionY, rightmostX, identityTJunctionY, '#2980b9');
+                }
+                
+                // Dessiner chaque identité et sa connexion
+                account.identities.forEach((identity, identityIndex) => {
+                    const identityX = identityPositions[identityIndex];
+                    
+                    // Ligne de connexion verticale vers l'identité
+                    drawStraightLine(identityX, identityTJunctionY, identityX, identityY - 40, '#2980b9');
+                    
+                    // Préparer le label de l'identité
+                    let identityLabel = identity.name;
+                    if (identity.role) identityLabel += `\n${identity.role}`;
+                    if (identity.justification) identityLabel += `\n${identity.justification}`;
+                    if (identity.lastReview) identityLabel += `\nDernière: ${identity.lastReview}`;
+                    if (identity.nextReview) identityLabel += `\nProchaine: ${identity.nextReview}`;
+                    
+                    // Dessiner l'identité avec menu contextuel
+                    drawNode(identityX, identityY, identityLabel, 'identity', 
+                            () => showContextMenu('identity', server.id, account.id, identity.id, identityX, identityY),
+                            () => deleteNode('identity', server.id, account.id, identity.id));
+                });
+            }
+        });
+        
+        serverXPosition += requiredWidth + 150; // Espacement entre serveurs élargi pour les comptes plus espacés
     });
+    
+    // Ajuster la taille du SVG pour contenir tous les éléments avec plus d'espace
+    const totalWidth = Math.max(1800, serverXPosition + 400);
+    const totalHeight = Math.max(900, 80 + (levelSpacing * 3) + 250);
+    svg.setAttribute('viewBox', `0 0 ${totalWidth} ${totalHeight}`);
+    svg.style.width = totalWidth + 'px';
+    svg.style.height = totalHeight + 'px';
 }
 
 function drawNode(x, y, text, type, onClick, onDelete) {
     const lines = text.split("\n");
     const maxLineLength = Math.max(...lines.map(l => l.length));
-    const width = Math.min(240, Math.max(120, maxLineLength * 7));
-    const height = 20 + lines.length * 15;
+    
+    // Calcul amélioré de la largeur avec plus d'espace pour le texte
+    const charWidth = type === 'identity' ? 9 : 7; // Encore plus d'espace pour les identités
+    const minWidth = type === 'identity' ? 180 : 120;
+    const maxWidth = type === 'identity' ? 320 : 240;
+    
+    const width = Math.min(maxWidth, Math.max(minWidth, maxLineLength * charWidth + 20));
+    const lineHeight = 16; // Hauteur de ligne augmentée
+    const padding = 12;
+    const height = padding * 2 + lines.length * lineHeight;
+    
     const g = document.createElementNS("http://www.w3.org/2000/svg","g");
     g.style.cursor = onClick ? 'pointer' : 'default';
     
@@ -1167,13 +1644,21 @@ function drawNode(x, y, text, type, onClick, onDelete) {
     if (onClick) rect.addEventListener('click', onClick);
     g.appendChild(rect);
     
+    // Amélioration du rendu du texte avec meilleur espacement
     lines.forEach((line, i) => {
         const label = document.createElementNS("http://www.w3.org/2000/svg","text");
         label.setAttribute("x", x);
-        label.setAttribute("y", y - (lines.length-1)*7 + i*15);
+        label.setAttribute("y", y - height/2 + padding + (i + 1) * lineHeight - 2);
         label.setAttribute("text-anchor", "middle");
         label.setAttribute("class", "label");
-        label.textContent = line;
+        
+        // Tronquer le texte s'il est trop long pour l'identité
+        let displayText = line;
+        if (type === 'identity' && line.length > 30) {
+            displayText = line.substring(0, 27) + '...';
+        }
+        
+        label.textContent = displayText;
         g.appendChild(label);
     });
     
@@ -1194,15 +1679,28 @@ function drawNode(x, y, text, type, onClick, onDelete) {
     svg.appendChild(g);
 }
 
+// Fonction pour dessiner des lignes droites
+function drawStraightLine(x1, y1, x2, y2, color) {
+    const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    line.setAttribute("x1", x1);
+    line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", y2);
+    line.setAttribute("stroke", color);
+    line.setAttribute("stroke-width", "3");
+    line.setAttribute("opacity", "0.9");
+    line.setAttribute("stroke-linecap", "round");
+    svg.appendChild(line);
+}
+
+// Fonction legacy maintenue pour compatibilité
 function drawLine(x1,y1,x2,y2,color) {
-    const path = document.createElementNS("http://www.w3.org/2000/svg","path");
-    const midY = (y1+y2)/2;
-    path.setAttribute("d", `M${x1},${y1} C${x1},${midY} ${x2},${midY} ${x2},${y2}`);
-    path.setAttribute("stroke", color);
-    path.setAttribute("fill", "none");
-    path.setAttribute("stroke-width", "2");
-    path.setAttribute("opacity", "0.7");
-    svg.appendChild(path);
+    drawStraightLine(x1, y1, x2, y2, color);
+}
+
+// Fonction pour dessiner des lignes en T (angles droits) - legacy
+function drawTLine(x1, y1, x2, y2, color) {
+    drawStraightLine(x1, y1, x2, y2, color);
 }
 
 // ==== JSON (JavaScript original conservé) ====
@@ -1254,7 +1752,7 @@ function exportDrawio() {
     };
 
     // Layout settings
-    const serverSpacingX = 300;   // Space between servers
+    const serverSpacingX = 120;   // Space between servers
     const accountSpacingY = 180;  // Vertical space between levels
     const accountSpacingX = 220;  // Horizontal space between accounts
     const identitySpacingX = 200; // Horizontal space between identities
@@ -1482,150 +1980,13 @@ async function confirmGenerateAuditPDF() {
             yPosition += 10;
         }
         
-        // === CAPTURE D'ÉCRAN DE LA CARTOGRAPHIE ===
-        pdf.setFontSize(14);
-        pdf.setFont(undefined, 'bold');
-        pdf.text('CARTOGRAPHIE VISUELLE', 20, yPosition);
-        yPosition += 10;
-        
-        // Générer la capture d'écran du SVG avec méthode alternative
-        let imgData = null;
-        let imgWidth = 240;
-        let imgHeight = 100;
-        
-        try {
-            // Méthode 1: Capturer le container complet
-            const container = document.getElementById('container');
-            const canvas = await html2canvas(container, {
-                backgroundColor: '#ffffff',
-                scale: 0.8,
-                logging: false,
-                useCORS: true,
-                allowTaint: true,
-                foreignObjectRendering: false,
-                imageTimeout: 5000,
-                removeContainer: false
-            });
-            
-            imgData = canvas.toDataURL('image/png');
-            imgHeight = (canvas.height * imgWidth) / canvas.width;
-            
-        } catch (error) {
-            console.warn('Méthode 1 échouée, tentative méthode 2:', error);
-            
-            try {
-                // Méthode 2: Convertir SVG en canvas manuellement
-                const svgElement = document.getElementById('svgCanvas');
-                const svgData = new XMLSerializer().serializeToString(svgElement);
-                const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
-                const svgUrl = URL.createObjectURL(svgBlob);
-                
-                const img = new Image();
-                await new Promise((resolve, reject) => {
-                    img.onload = resolve;
-                    img.onerror = reject;
-                    img.src = svgUrl;
-                });
-                
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = 800;
-                tempCanvas.height = 600;
-                const ctx = tempCanvas.getContext('2d');
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-                ctx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
-                
-                imgData = tempCanvas.toDataURL('image/png');
-                imgHeight = (tempCanvas.height * imgWidth) / tempCanvas.width;
-                
-                URL.revokeObjectURL(svgUrl);
-                
-            } catch (error2) {
-                console.warn('Méthode 2 échouée, génération placeholder:', error2);
-                
-                // Méthode 3: Générer un placeholder avec les données
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = 800;
-                tempCanvas.height = 400;
-                const ctx = tempCanvas.getContext('2d');
-                
-                // Fond blanc
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-                
-                // Bordure
-                ctx.strokeStyle = '#667eea';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(10, 10, tempCanvas.width - 20, tempCanvas.height - 20);
-                
-                // Titre
-                ctx.fillStyle = '#2d3748';
-                ctx.font = 'bold 24px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('Cartographie des Comptes Privilégiés', tempCanvas.width / 2, 50);
-                
-                // Statistiques visuelles
-                ctx.font = '16px Arial';
-                const stats = calculateDetailedStats();
-                let yPos = 100;
-                
-                ctx.fillText(` ${stats.serverCount} Serveurs`, tempCanvas.width / 2, yPos);
-                yPos += 30;
-                ctx.fillText(` ${stats.accountCount} Comptes`, tempCanvas.width / 2, yPos);
-                yPos += 30;
-                ctx.fillText(` ${stats.identityCount} Identités`, tempCanvas.width / 2, yPos);
-                yPos += 50;
-                
-                // Message d'information
-                ctx.font = '14px Arial';
-                ctx.fillStyle = '#718096';
-                ctx.fillText('Représentation simplifiée - Cartographie détaillée dans l\'inventaire ci-dessous', tempCanvas.width / 2, yPos);
-                
-                // Dessiner des éléments représentatifs
-                if (data.servers.length > 0) {
-                    ctx.fillStyle = '#8e44ad';
-                    let xPos = 100;
-                    data.servers.slice(0, 5).forEach((server, index) => {
-                        ctx.fillRect(xPos, 250, 80, 40);
-                        ctx.fillStyle = '#ffffff';
-                        ctx.font = 'bold 12px Arial';
-                        ctx.textAlign = 'center';
-                        ctx.fillText(server.name.substring(0, 10), xPos + 40, 275);
-                        ctx.fillStyle = '#8e44ad';
-                        xPos += 120;
-                    });
-                }
-                
-                imgData = tempCanvas.toDataURL('image/png');
-                imgHeight = (tempCanvas.height * imgWidth) / tempCanvas.width;
-            }
-        }
-        
-        // Vérifier si on a assez de place sur la page
-        if (yPosition + imgHeight > 180) {
-            pdf.addPage();
-            yPosition = 20;
-        }
-        
-        if (imgData) {
-            pdf.addImage(imgData, 'PNG', 20, yPosition, imgWidth, imgHeight);
-            yPosition += imgHeight + 10;
-        } else {
-            pdf.setFontSize(10);
-            pdf.setFont(undefined, 'italic');
-            pdf.text('Impossible de générer l\'image de la cartographie - Voir détails ci-dessous', 20, yPosition);
-            yPosition += 10;
-        }
-        
-        // === DÉTAIL DES ÉLÉMENTS ===
-        pdf.addPage();
-        yPosition = 20;
-        
+        // === INVENTAIRE DÉTAILLÉ ===
         pdf.setFontSize(14);
         pdf.setFont(undefined, 'bold');
         pdf.text('INVENTAIRE DÉTAILLÉ', 20, yPosition);
         yPosition += 10;
         
+        // Section inventaire détaillé d'abord
         data.servers.forEach((server, serverIndex) => {
             // Vérifier si on a assez de place
             if (yPosition > 180) {
@@ -1668,7 +2029,7 @@ async function confirmGenerateAuditPDF() {
                     }
                     
                     pdf.setFont(undefined, 'italic');
-                    pdf.text(`        Identite: ${identity.name}`, 35, yPosition);
+                    pdf.text(`        Identité: ${identity.name}`, 35, yPosition);
                     yPosition += 4;
                     
                     pdf.setFont(undefined, 'normal');
@@ -1681,6 +2042,143 @@ async function confirmGenerateAuditPDF() {
             });
             yPosition += 5;
         });
+
+        // === CARTOGRAPHIE VISUELLE ===
+        pdf.addPage();
+        yPosition = 20;
+        
+        pdf.setFontSize(14);
+        pdf.setFont(undefined, 'bold');
+        pdf.text('CARTOGRAPHIE VISUELLE PAR PAGE', 20, yPosition);
+        yPosition += 10;
+        
+        // Sauvegarder la page actuelle et générer des captures pour chaque page
+        const originalPage = currentPage;
+        const originalServersPerPage = serversPerPage;
+        let imgWidth = 240;
+        let imgHeight = 100;
+        
+        // Générer une image pour chaque page de serveurs
+        const totalPages = Math.max(1, Math.ceil(data.servers.length / serversPerPage));
+        
+        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+            // Changer temporairement vers cette page pour le rendu
+            currentPage = pageNum;
+            render(); // Re-rendre pour cette page
+            
+            // Attendre un petit délai pour que le rendu se termine
+            await new Promise(resolve => setTimeout(resolve, 200));
+            
+            let imgData = null;
+            
+            pdf.setFontSize(12);
+            pdf.setFont(undefined, 'bold');
+            pdf.text(`Page ${pageNum}/${totalPages} - Serveurs ${((pageNum-1)*serversPerPage)+1} à ${Math.min(pageNum*serversPerPage, data.servers.length)}`, 20, yPosition);
+            yPosition += 8;
+            
+            try {
+                // Méthode 1: Capturer le container complet
+                const container = document.getElementById('container');
+                const canvas = await html2canvas(container, {
+                    backgroundColor: '#ffffff',
+                    scale: 0.6,
+                    logging: false,
+                    useCORS: true,
+                    allowTaint: true,
+                    foreignObjectRendering: false,
+                    imageTimeout: 5000,
+                    removeContainer: false
+                });
+                
+                imgData = canvas.toDataURL('image/png');
+                imgHeight = Math.min(120, (canvas.height * imgWidth) / canvas.width);
+                
+            } catch (error) {
+                console.warn(`Erreur capture page ${pageNum}:`, error);
+                
+                // Générer un placeholder pour cette page
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = 800;
+                tempCanvas.height = 300;
+                const ctx = tempCanvas.getContext('2d');
+                
+                // Fond blanc
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+                
+                // Bordure
+                ctx.strokeStyle = '#667eea';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(10, 10, tempCanvas.width - 20, tempCanvas.height - 20);
+                
+                // Titre
+                ctx.fillStyle = '#2d3748';
+                ctx.font = 'bold 20px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(`Cartographie - Page ${pageNum}/${totalPages}`, tempCanvas.width / 2, 50);
+                
+                // Dessiner représentation des serveurs de cette page
+                const startIndex = (pageNum - 1) * serversPerPage;
+                const endIndex = Math.min(startIndex + serversPerPage, data.servers.length);
+                const pageServers = data.servers.slice(startIndex, endIndex);
+                
+                ctx.font = '14px Arial';
+                ctx.fillStyle = '#8e44ad';
+                let xPos = 80;
+                pageServers.forEach((server, index) => {
+                    ctx.fillRect(xPos, 120, 100, 50);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 12px Arial';
+                    ctx.fillText(server.name.substring(0, 12), xPos + 50, 150);
+                    ctx.fillStyle = '#8e44ad';
+                    xPos += 130;
+                    
+                    // Limiter l'affichage pour éviter le débordement
+                    if (index >= 4) return;
+                });
+                
+                ctx.fillStyle = '#718096';
+                ctx.font = '12px Arial';
+                ctx.fillText('Représentation simplifiée - Voir détails dans l\'inventaire', tempCanvas.width / 2, 220);
+                
+                imgData = tempCanvas.toDataURL('image/png');
+                imgHeight = (tempCanvas.height * imgWidth) / tempCanvas.width;
+            }
+            
+            // Vérifier si on a assez de place sur la page
+            if (yPosition + imgHeight > 160) {
+                pdf.addPage();
+                yPosition = 20;
+                pdf.setFontSize(12);
+                pdf.setFont(undefined, 'bold');
+                pdf.text(`Page ${pageNum}/${totalPages} - Serveurs ${((pageNum-1)*serversPerPage)+1} à ${Math.min(pageNum*serversPerPage, data.servers.length)}`, 20, yPosition);
+                yPosition += 8;
+            }
+            
+            if (imgData) {
+                // Centrer l'image sur la page
+                const pageWidth = pdf.internal.pageSize.width;
+                const centeredX = (pageWidth - imgWidth) / 2;
+                pdf.addImage(imgData, 'PNG', centeredX, yPosition, imgWidth, imgHeight);
+                yPosition += imgHeight + 15;
+            } else {
+                pdf.setFontSize(10);
+                pdf.setFont(undefined, 'italic');
+                pdf.text(`Impossible de générer l'image pour la page ${pageNum}`, 20, yPosition);
+                yPosition += 10;
+            }
+            
+            // Ajouter une nouvelle page pour la page suivante (sauf pour la dernière)
+            if (pageNum < totalPages) {
+                pdf.addPage();
+                yPosition = 20;
+            }
+        }
+        
+        // Restaurer la page originale
+        currentPage = originalPage;
+        serversPerPage = originalServersPerPage;
+        render();
         
         // === COMMENTAIRES D'AUDIT ===
         if (pdfData.comments) {
@@ -2057,6 +2555,68 @@ function centerView() {
     setTimeout(() => updateConnectionIndicator('✓ Prêt'), 1500);
 }
 
+// ==== FONCTIONS DE PAGINATION ====
+function changePage(direction) {
+    const newPage = currentPage + direction;
+    if (newPage >= 1 && newPage <= maxTotalPages) {
+        currentPage = newPage;
+        render();
+        updateStats();
+        
+        // Animation de feedback
+        updateConnectionIndicator(`Page ${currentPage}/${maxTotalPages}`);
+        setTimeout(() => updateConnectionIndicator('✓ Prêt'), 1500);
+        
+        // Centrer la vue sur la nouvelle page
+        setTimeout(() => {
+            resetZoom();
+            centerView();
+        }, 100);
+    }
+}
+
+function updatePaginationControls(currentPageServers) {
+    const pageInfo = document.getElementById('pageInfo');
+    const pageElementCount = document.getElementById('pageElementCount');
+    const prevBtn = document.getElementById('prevPageBtn');
+    const nextBtn = document.getElementById('nextPageBtn');
+    
+    if (pageInfo) {
+        pageInfo.textContent = `${currentPage}/${maxTotalPages}`;
+    }
+    
+    if (pageElementCount) {
+        pageElementCount.textContent = `${currentPageServers} serveur${currentPageServers > 1 ? 's' : ''} affiché${currentPageServers > 1 ? 's' : ''}`;
+    }
+    
+    if (prevBtn) {
+        prevBtn.disabled = currentPage <= 1;
+        prevBtn.style.opacity = currentPage <= 1 ? '0.5' : '1';
+    }
+    
+    if (nextBtn) {
+        nextBtn.disabled = currentPage >= maxTotalPages;
+        nextBtn.style.opacity = currentPage >= maxTotalPages ? '0.5' : '1';
+    }
+}
+
+// Fonction pour aller à une page spécifique
+function goToPage(pageNumber) {
+    if (pageNumber >= 1 && pageNumber <= maxTotalPages) {
+        currentPage = pageNumber;
+        render();
+        updateStats();
+    }
+}
+
+// Fonction pour ajuster le nombre de serveurs par page
+function setServersPerPage(count) {
+    serversPerPage = Math.max(1, count);
+    currentPage = 1; // Retour à la première page
+    render();
+    updateStats();
+}
+
 // Gestion des événements du redimensionnement
 window.addEventListener('resize', () => {
     render();
@@ -2164,7 +2724,182 @@ function generateDocumentHash() {
     return Math.abs(hash).toString(16).toUpperCase();
 }
 
-console.log('Cartographie ISO27001 - Version améliorée initialisée');
+// ==== MENU CONTEXTUEL ====
+function showContextMenu(elementType, serverId, accountId, identityId, x, y) {
+    const existingMenu = document.getElementById('contextMenu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
+    
+    const menu = document.createElement('div');
+    menu.id = 'contextMenu';
+    menu.style.cssText = `
+        position: absolute;
+        background: white;
+        border: 2px solid var(--primary);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+        min-width: 200px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    `;
+    
+    const container = document.getElementById('container');
+    const rect = container.getBoundingClientRect();
+    menu.style.left = (rect.left + x + 20) + 'px';
+    menu.style.top = (rect.top + y - 10) + 'px';
+    
+    const options = [];
+    
+    if (elementType === 'server') {
+        options.push({ text: '✏️ Modifier ce serveur', action: () => openEditServerModal(serverId) });
+        options.push({ text: '➕ Ajouter un compte', action: () => openAddAccountModal(serverId) });
+    } else if (elementType === 'account') {
+        options.push({ text: '✏️ Modifier ce compte', action: () => openEditAccountModal(serverId, accountId) });
+        options.push({ text: '➕ Ajouter une identité', action: () => openAddIdentityModal(serverId, accountId) });
+    } else if (elementType === 'identity') {
+        options.push({ text: '✏️ Modifier cette identité', action: () => openEditIdentityModal(serverId, accountId, identityId) });
+        options.push({ text: '➕ Ajouter une autre identité', action: () => openAddIdentityModal(serverId, accountId) });
+    }
+    
+    options.forEach((option, index) => {
+        const button = document.createElement('button');
+        button.textContent = option.text;
+        button.style.cssText = `
+            display: block;
+            width: 100%;
+            padding: 12px 16px;
+            border: none;
+            background: ${index === 0 ? 'var(--primary)' : 'white'};
+            color: ${index === 0 ? 'white' : 'var(--dark)'};
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background 0.2s;
+            ${index === 0 ? 'border-radius: 6px 6px 0 0;' : ''}
+            ${index === options.length - 1 ? 'border-radius: 0 0 6px 6px;' : ''}
+        `;
+        
+        button.addEventListener('mouseenter', () => {
+            if (index !== 0) {
+                button.style.background = '#f8f9fa';
+            }
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            if (index !== 0) {
+                button.style.background = 'white';
+            }
+        });
+        
+        button.addEventListener('click', () => {
+            option.action();
+            menu.remove();
+        });
+        
+        menu.appendChild(button);
+        
+        if (index < options.length - 1) {
+            const separator = document.createElement('div');
+            separator.style.cssText = 'height: 1px; background: #e2e8f0; margin: 0;';
+            menu.appendChild(separator);
+        }
+    });
+    
+    document.body.appendChild(menu);
+    
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+    }, 100);
+}
+
+// Menu contextuel pour zone vide
+function showEmptyAreaContextMenu(x, y) {
+    const existingMenu = document.getElementById('contextMenu');
+    if (existingMenu) {
+        existingMenu.remove();
+    }
+    
+    const menu = document.createElement('div');
+    menu.id = 'contextMenu';
+    menu.style.cssText = `
+        position: absolute;
+        background: white;
+        border: 2px solid var(--primary);
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+        min-width: 200px;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    `;
+    
+    const container = document.getElementById('container');
+    const rect = container.getBoundingClientRect();
+    menu.style.left = (rect.left + x + 20) + 'px';
+    menu.style.top = (rect.top + y - 10) + 'px';
+    
+    const options = [
+        { text: '🖥️ Ajouter un serveur', action: () => openAddServerModal() }
+    ];
+    
+    options.forEach((option, index) => {
+        const button = document.createElement('button');
+        button.textContent = option.text;
+        button.style.cssText = `
+            display: block;
+            width: 100%;
+            padding: 12px 16px;
+            border: none;
+            background: var(--primary);
+            color: white;
+            text-align: left;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            border-radius: 6px;
+            transition: all 0.2s ease;
+        `;
+        
+        button.addEventListener('mouseenter', () => {
+            button.style.background = 'var(--primary-dark)';
+        });
+        
+        button.addEventListener('mouseleave', () => {
+            button.style.background = 'var(--primary)';
+        });
+        
+        button.addEventListener('click', () => {
+            option.action();
+            menu.remove();
+        });
+        
+        menu.appendChild(button);
+    });
+    
+    // Fermer le menu en cliquant ailleurs
+    const closeMenu = (e) => {
+        if (!menu.contains(e.target)) {
+            menu.remove();
+            document.removeEventListener('click', closeMenu);
+        }
+    };
+    
+    setTimeout(() => {
+        document.addEventListener('click', closeMenu);
+    }, 10);
+    
+    document.body.appendChild(menu);
+}
+
+console.log('Cartographie ISO27001 - Version améliorée avec menu contextuel initialisée');
 </script>
 
 </body>
