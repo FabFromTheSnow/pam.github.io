@@ -1564,61 +1564,760 @@
         }
 
         function drawVerticalCartography(svg, width, height, flows) {
+            // BPMN-style top-bottom flowchart with sources at bottom and destinations at top
+            const laneHeight = height / 2;
             const margin = 80;
-            const sourceY = height - margin;
-            const destY = margin;
+            const headerHeight = 60;
+            const nodeSpacing = 140;
             
+            // Calculate dynamic height based on number of flows for better spacing
+            const numFlows = flows.length;
+            const minHeight = 800;
+            const dynamicHeight = Math.max(minHeight, numFlows * 40 + 400);
+            
+            // Update SVG height if needed for dynamic sizing
+            if (dynamicHeight > height) {
+                svg.setAttribute('height', dynamicHeight);
+                height = dynamicHeight;
+            }
+            
+            // Recalculate lane height with new dimensions
+            const finalLaneHeight = height / 2;
+            
+            // Draw BPMN-style swimlanes background
+            drawBPMNSwimlanes(svg, width, height, finalLaneHeight, headerHeight, 'vertical');
+            
+            // Get unique source and destination IPs
+            const sourceIPs = getUniqueSourceIPs(flows);
+            const destIPs = getUniqueDestIPs(flows);
+            
+            // Calculate proper horizontal positions for nodes with fixed spacing
+            const availableWidth = width - margin * 2;
+            const nodeWidth = 120; // Width of BPMN nodes
+            const minSpacing = nodeWidth + 50; // Minimum space between node centers
+            
+            // Calculate actual spacing ensuring nodes don't overlap
+            const sourceSpacing = sourceIPs.length > 1 ? Math.max(minSpacing, availableWidth / sourceIPs.length) : availableWidth / 2;
+            const destSpacing = destIPs.length > 1 ? Math.max(minSpacing, availableWidth / destIPs.length) : availableWidth / 2;
+            
+            // Position source nodes at bottom with proper horizontal spacing
             const sourceNodes = new Map();
+            sourceIPs.forEach((ip, index) => {
+                const startX = margin + (sourceSpacing / 2);
+                const x = startX + (index * sourceSpacing);
+                sourceNodes.set(ip, {
+                    ip: ip,
+                    x: x,
+                    y: height - finalLaneHeight + finalLaneHeight / 2, // Bottom lane center
+                    connections: flows.filter(f => f.sourceIP === ip).length
+                });
+            });
+            
+            // Position destination nodes at top with proper horizontal spacing
             const destNodes = new Map();
-            
-            let sourceIndex = 0;
-            let destIndex = 0;
-            
-            // Sources en bas
-            flows.forEach(flow => {
-                if (!sourceNodes.has(flow.sourceIP)) {
-                    sourceNodes.set(flow.sourceIP, {
-                        ip: flow.sourceIP,
-                        x: (sourceIndex + 1) * width / (getUniqueSourceIPs(flows).length + 1),
-                        y: sourceY,
-                        connections: 0
-                    });
-                    sourceIndex++;
-                }
-                sourceNodes.get(flow.sourceIP).connections++;
+            destIPs.forEach((ip, index) => {
+                const startX = margin + (destSpacing / 2);
+                const x = startX + (index * destSpacing);
+                destNodes.set(ip, {
+                    ip: ip,
+                    x: x,
+                    y: headerHeight + finalLaneHeight / 2, // Top lane center
+                    connections: flows.filter(f => f.destIP === ip).length
+                });
             });
             
-            // Destinations en haut
-            flows.forEach(flow => {
-                if (!destNodes.has(flow.destIP)) {
-                    destNodes.set(flow.destIP, {
-                        ip: flow.destIP,
-                        x: (destIndex + 1) * width / (getUniqueDestIPs(flows).length + 1),
-                        y: destY,
-                        connections: 0
-                    });
-                    destIndex++;
-                }
-                destNodes.get(flow.destIP).connections++;
-            });
-
+            // Create arrow markers for BPMN-style flows
             createArrowMarkers(svg);
+            
+            // Draw dual T-junction system: Source T-junctions + Destination T-junctions
+            drawDualTJunctionSystem(svg, sourceNodes, destNodes, flows, finalLaneHeight);
 
-            flows.forEach(flow => {
-                const source = sourceNodes.get(flow.sourceIP);
-                const dest = destNodes.get(flow.destIP);
-                
-                if (!source || !dest) return;
-                drawFlowArrow(svg, source, dest, flow);
-            });
-
+            // Draw source nodes (left lane)
             sourceNodes.forEach(node => {
-                drawNode(svg, node, '#4caf50', 'Source');
+                drawBPMNNode(svg, node, '#4caf50', 'source');
             });
 
+            // Draw destination nodes (right lane)
             destNodes.forEach(node => {
-                drawNode(svg, node, '#2196f3', 'Destination');
+                drawBPMNNode(svg, node, '#2196f3', 'destination');
             });
+        }
+
+        function drawBPMNSwimlanes(svg, width, height, laneHeight, headerHeight, orientation = 'horizontal') {
+            // Draw BPMN-style swimlane background
+            
+            if (orientation === 'vertical') {
+                // Vertical orientation: top lane for destinations, bottom lane for sources
+                const midY = height / 2;
+                
+                // Lane separator line (horizontal)
+                const separator = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                separator.setAttribute('x1', 0);
+                separator.setAttribute('y1', midY);
+                separator.setAttribute('x2', width);
+                separator.setAttribute('y2', midY);
+                separator.setAttribute('stroke', '#ddd');
+                separator.setAttribute('stroke-width', '2');
+                separator.setAttribute('stroke-dasharray', '5,5');
+                svg.appendChild(separator);
+                
+                // Top lane for destinations
+                const topHeader = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                topHeader.setAttribute('x', 0);
+                topHeader.setAttribute('y', 0);
+                topHeader.setAttribute('width', width);
+                topHeader.setAttribute('height', headerHeight);
+                topHeader.setAttribute('fill', 'rgba(33, 150, 243, 0.1)');
+                topHeader.setAttribute('stroke', '#2196f3');
+                topHeader.setAttribute('stroke-width', '1');
+                svg.appendChild(topHeader);
+                
+                // Bottom lane for sources
+                const bottomHeader = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                bottomHeader.setAttribute('x', 0);
+                bottomHeader.setAttribute('y', height - headerHeight);
+                bottomHeader.setAttribute('width', width);
+                bottomHeader.setAttribute('height', headerHeight);
+                bottomHeader.setAttribute('fill', 'rgba(76, 175, 80, 0.1)');
+                bottomHeader.setAttribute('stroke', '#4caf50');
+                bottomHeader.setAttribute('stroke-width', '1');
+                svg.appendChild(bottomHeader);
+                
+                // Lane titles
+                const destTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                destTitle.setAttribute('x', width / 2);
+                destTitle.setAttribute('y', headerHeight / 2 + 5);
+                destTitle.setAttribute('text-anchor', 'middle');
+                destTitle.setAttribute('fill', '#2196f3');
+                destTitle.setAttribute('font-size', '16');
+                destTitle.setAttribute('font-weight', 'bold');
+                destTitle.textContent = '🎯 Destinations';
+                svg.appendChild(destTitle);
+                
+                const sourceTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                sourceTitle.setAttribute('x', width / 2);
+                sourceTitle.setAttribute('y', height - headerHeight / 2 + 5);
+                sourceTitle.setAttribute('text-anchor', 'middle');
+                sourceTitle.setAttribute('fill', '#4caf50');
+                sourceTitle.setAttribute('font-size', '16');
+                sourceTitle.setAttribute('font-weight', 'bold');
+                sourceTitle.textContent = '🖥️ Sources';
+                svg.appendChild(sourceTitle);
+                
+            } else {
+                // Original horizontal orientation
+                const laneWidth = width / 2;
+                
+                // Lane separator line
+                const separator = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                separator.setAttribute('x1', laneWidth);
+                separator.setAttribute('y1', 0);
+                separator.setAttribute('x2', laneWidth);
+                separator.setAttribute('y2', height);
+                separator.setAttribute('stroke', '#ddd');
+                separator.setAttribute('stroke-width', '2');
+                separator.setAttribute('stroke-dasharray', '5,5');
+                svg.appendChild(separator);
+                
+                // Lane headers background
+                const leftHeader = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                leftHeader.setAttribute('x', 0);
+                leftHeader.setAttribute('y', 0);
+                leftHeader.setAttribute('width', laneWidth);
+                leftHeader.setAttribute('height', headerHeight);
+                leftHeader.setAttribute('fill', 'rgba(76, 175, 80, 0.1)');
+                leftHeader.setAttribute('stroke', '#4caf50');
+                leftHeader.setAttribute('stroke-width', '1');
+                svg.appendChild(leftHeader);
+                
+                const rightHeader = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rightHeader.setAttribute('x', laneWidth);
+                rightHeader.setAttribute('y', 0);
+                rightHeader.setAttribute('width', laneWidth);
+                rightHeader.setAttribute('height', headerHeight);
+                rightHeader.setAttribute('fill', 'rgba(33, 150, 243, 0.1)');
+                rightHeader.setAttribute('stroke', '#2196f3');
+                rightHeader.setAttribute('stroke-width', '1');
+                svg.appendChild(rightHeader);
+                
+                // Lane titles
+                const sourceTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                sourceTitle.setAttribute('x', laneWidth / 2);
+                sourceTitle.setAttribute('y', headerHeight / 2 + 5);
+                sourceTitle.setAttribute('text-anchor', 'middle');
+                sourceTitle.setAttribute('fill', '#4caf50');
+                sourceTitle.setAttribute('font-size', '16');
+                sourceTitle.setAttribute('font-weight', 'bold');
+                sourceTitle.textContent = '🖥️ Sources';
+                svg.appendChild(sourceTitle);
+                
+                const destTitle = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                destTitle.setAttribute('x', laneWidth + (laneWidth / 2));
+                destTitle.setAttribute('y', headerHeight / 2 + 5);
+                destTitle.setAttribute('text-anchor', 'middle');
+                destTitle.setAttribute('fill', '#2196f3');
+                destTitle.setAttribute('font-size', '16');
+                destTitle.setAttribute('font-weight', 'bold');
+                destTitle.textContent = '🎯 Destinations';
+                svg.appendChild(destTitle);
+            }
+        }
+
+        function drawDualTJunctionSystem(svg, sourceNodes, destNodes, flows, laneHeight) {
+            // Create comprehensive dual T-junction system showing ALL flows - vertical orientation
+            
+            const sourceTBusY = svg.getAttribute('height') - laneHeight / 2 - 80;  // Source T-junction bus position (horizontal line)
+            const destTBusY = laneHeight / 2 + 80;  // Destination T-junction bus position (horizontal line)  
+            const bridgeX = (Math.max(...Array.from(sourceNodes.values()).map(n => n.x)) + 
+                           Math.max(...Array.from(destNodes.values()).map(n => n.x))) / 2; // Middle bridge level
+            
+            // Group flows by source for source T-junctions
+            const flowsBySource = new Map();
+            flows.forEach(flow => {
+                if (!flowsBySource.has(flow.sourceIP)) {
+                    flowsBySource.set(flow.sourceIP, []);
+                }
+                flowsBySource.get(flow.sourceIP).push(flow);
+            });
+            
+            // Group flows by destination for destination T-junctions
+            const flowsByDestination = new Map();
+            flows.forEach(flow => {
+                if (!flowsByDestination.has(flow.destIP)) {
+                    flowsByDestination.set(flow.destIP, []);
+                }
+                flowsByDestination.get(flow.destIP).push(flow);
+            });
+            
+            // Draw source-side T-junctions (vertical orientation)
+            flowsBySource.forEach((sourceFlows, sourceIP) => {
+                const sourceNode = sourceNodes.get(sourceIP);
+                if (!sourceNode || sourceFlows.length === 0) return;
+                
+                drawVerticalSourceTJunction(svg, sourceNode, sourceFlows, sourceTBusY, bridgeX);
+            });
+            
+            // Draw destination-side T-junctions (vertical orientation)
+            flowsByDestination.forEach((destFlows, destIP) => {
+                const destNode = destNodes.get(destIP);
+                if (!destNode || destFlows.length === 0) return;
+                
+                drawVerticalDestinationTJunction(svg, destNode, destFlows, destTBusY, bridgeX);
+            });
+            
+            // Draw individual flow bridges connecting source T to destination T (vertical)
+            flows.forEach(flow => {
+                drawVerticalFlowBridge(svg, flow, sourceTBusY, destTBusY, bridgeX);
+            });
+        }
+        
+        function drawSourceTJunction(svg, sourceNode, flows, tBusX, bridgeY) {
+            // Calculate vertical extent for this source's T-junction
+            const flowYPositions = flows.map((flow, index) => bridgeY + (index - flows.length/2) * 25);
+            const minY = Math.min(sourceNode.y, ...flowYPositions);
+            const maxY = Math.max(sourceNode.y, ...flowYPositions);
+            
+            // Main horizontal line from source node
+            const sourceLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            sourceLine.setAttribute('x1', sourceNode.x + 60);
+            sourceLine.setAttribute('y1', sourceNode.y);
+            sourceLine.setAttribute('x2', tBusX);
+            sourceLine.setAttribute('y2', sourceNode.y);
+            sourceLine.setAttribute('stroke', '#4caf50');
+            sourceLine.setAttribute('stroke-width', '3');
+            svg.appendChild(sourceLine);
+            
+            // Vertical T-junction bus for this source
+            const verticalBus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            verticalBus.setAttribute('x1', tBusX);
+            verticalBus.setAttribute('y1', minY);
+            verticalBus.setAttribute('x2', tBusX);
+            verticalBus.setAttribute('y2', maxY);
+            verticalBus.setAttribute('stroke', '#4caf50');
+            verticalBus.setAttribute('stroke-width', '3');
+            svg.appendChild(verticalBus);
+            
+            // Individual flow connections from T-junction
+            flows.forEach((flow, index) => {
+                const flowY = bridgeY + (index - (flows.length - 1) / 2) * 25;
+                
+                const riskColors = {
+                    low: '#4caf50',
+                    medium: '#ff9800',
+                    high: '#f44336', 
+                    critical: '#d32f2f'
+                };
+                
+                const color = riskColors[flow.riskLevel] || '#666';
+                const strokeWidth = flow.riskLevel === 'critical' ? 3 : flow.riskLevel === 'high' ? 2 : 1;
+                
+                // Horizontal line from T-junction to bridge area
+                const flowLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                flowLine.setAttribute('x1', tBusX);
+                flowLine.setAttribute('y1', flowY);
+                flowLine.setAttribute('x2', tBusX + 40);
+                flowLine.setAttribute('y2', flowY);
+                flowLine.setAttribute('stroke', color);
+                flowLine.setAttribute('stroke-width', strokeWidth);
+                svg.appendChild(flowLine);
+                
+                // Flow label
+                const labelX = tBusX + 20;
+                const labelY = flowY - 5;
+                
+                const labelText = `${flow.protocol}`;
+                const portText = flow.destPort ? `:${flow.destPort}` : '';
+                
+                const protocolLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                protocolLabel.setAttribute('x', labelX);
+                protocolLabel.setAttribute('y', labelY);
+                protocolLabel.setAttribute('text-anchor', 'middle');
+                protocolLabel.setAttribute('fill', color);
+                protocolLabel.setAttribute('font-size', '8');
+                protocolLabel.setAttribute('font-weight', 'bold');
+                protocolLabel.textContent = labelText + portText;
+                svg.appendChild(protocolLabel);
+            });
+        }
+        
+        function drawDestinationTJunction(svg, destNode, flows, tBusX, bridgeY) {
+            // Calculate vertical extent for this destination's T-junction
+            const flowYPositions = flows.map((flow, index) => bridgeY + (index - flows.length/2) * 25);
+            const minY = Math.min(destNode.y, ...flowYPositions);
+            const maxY = Math.max(destNode.y, ...flowYPositions);
+            
+            // Vertical T-junction bus for this destination
+            const verticalBus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            verticalBus.setAttribute('x1', tBusX);
+            verticalBus.setAttribute('y1', minY);
+            verticalBus.setAttribute('x2', tBusX);
+            verticalBus.setAttribute('y2', maxY);
+            verticalBus.setAttribute('stroke', '#2196f3');
+            verticalBus.setAttribute('stroke-width', '3');
+            svg.appendChild(verticalBus);
+            
+            // Main horizontal line to destination node
+            const destLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            destLine.setAttribute('x1', tBusX);
+            destLine.setAttribute('y1', destNode.y);
+            destLine.setAttribute('x2', destNode.x - 60);
+            destLine.setAttribute('y2', destNode.y);
+            destLine.setAttribute('stroke', '#2196f3');
+            destLine.setAttribute('stroke-width', '3');
+            destLine.setAttribute('marker-end', 'url(#arrow-medium)');
+            svg.appendChild(destLine);
+            
+            // Individual flow connections to T-junction
+            flows.forEach((flow, index) => {
+                const flowY = bridgeY + (index - (flows.length - 1) / 2) * 25;
+                
+                const riskColors = {
+                    low: '#4caf50',
+                    medium: '#ff9800',
+                    high: '#f44336',
+                    critical: '#d32f2f'
+                };
+                
+                const color = riskColors[flow.riskLevel] || '#666';
+                const strokeWidth = flow.riskLevel === 'critical' ? 3 : flow.riskLevel === 'high' ? 2 : 1;
+                
+                // Horizontal line from bridge area to T-junction
+                const flowLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                flowLine.setAttribute('x1', tBusX - 40);
+                flowLine.setAttribute('y1', flowY);
+                flowLine.setAttribute('x2', tBusX);
+                flowLine.setAttribute('y2', flowY);
+                flowLine.setAttribute('stroke', color);
+                flowLine.setAttribute('stroke-width', strokeWidth);
+                svg.appendChild(flowLine);
+            });
+        }
+        
+        function drawFlowBridge(svg, flow, sourceTBusX, destTBusX, bridgeY) {
+            // Draw individual flow bridge connecting source T to destination T
+            const riskColors = {
+                low: '#4caf50',
+                medium: '#ff9800',
+                high: '#f44336',
+                critical: '#d32f2f'
+            };
+            
+            const color = riskColors[flow.riskLevel] || '#666';
+            const strokeWidth = flow.riskLevel === 'critical' ? 3 : flow.riskLevel === 'high' ? 2 : 1;
+            
+            // Get flow positions (this needs to match the Y positions calculated in T-junction functions)
+            // For now, use a simple offset system
+            const flowIndex = Math.abs(flow.sourceIP.charCodeAt(flow.sourceIP.length-1) + 
+                                     flow.destIP.charCodeAt(flow.destIP.length-1)) % 10;
+            const flowY = bridgeY + (flowIndex - 5) * 25;
+            
+            // Horizontal bridge line
+            const bridgeLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            bridgeLine.setAttribute('x1', sourceTBusX + 40);
+            bridgeLine.setAttribute('y1', flowY);
+            bridgeLine.setAttribute('x2', destTBusX - 40);
+            bridgeLine.setAttribute('y2', flowY);
+            bridgeLine.setAttribute('stroke', color);
+            bridgeLine.setAttribute('stroke-width', strokeWidth);
+            bridgeLine.setAttribute('stroke-dasharray', '5,3');
+            svg.appendChild(bridgeLine);
+        }
+
+        function drawVerticalSourceTJunction(svg, sourceNode, flows, tBusY, bridgeX) {
+            // Calculate horizontal extent for this source's T-junction (vertical orientation)
+            const flowXPositions = flows.map((flow, index) => bridgeX + (index - flows.length/2) * 40);
+            const minX = Math.min(sourceNode.x, ...flowXPositions);
+            const maxX = Math.max(sourceNode.x, ...flowXPositions);
+            
+            // Main vertical line from source node upward
+            const sourceLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            sourceLine.setAttribute('x1', sourceNode.x);
+            sourceLine.setAttribute('y1', sourceNode.y - 30);
+            sourceLine.setAttribute('x2', sourceNode.x);
+            sourceLine.setAttribute('y2', tBusY);
+            sourceLine.setAttribute('stroke', '#4caf50');
+            sourceLine.setAttribute('stroke-width', '3');
+            svg.appendChild(sourceLine);
+            
+            // Horizontal T-junction bus for this source
+            const horizontalBus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            horizontalBus.setAttribute('x1', minX);
+            horizontalBus.setAttribute('y1', tBusY);
+            horizontalBus.setAttribute('x2', maxX);
+            horizontalBus.setAttribute('y2', tBusY);
+            horizontalBus.setAttribute('stroke', '#4caf50');
+            horizontalBus.setAttribute('stroke-width', '3');
+            svg.appendChild(horizontalBus);
+            
+            // Individual flow connections from T-junction
+            flows.forEach((flow, index) => {
+                const flowX = bridgeX + (index - (flows.length - 1) / 2) * 40;
+                
+                const riskColors = {
+                    low: '#4caf50',
+                    medium: '#ff9800',
+                    high: '#f44336', 
+                    critical: '#d32f2f'
+                };
+                
+                const color = riskColors[flow.riskLevel] || '#666';
+                const strokeWidth = flow.riskLevel === 'critical' ? 3 : flow.riskLevel === 'high' ? 2 : 1;
+                
+                // Vertical line from T-junction toward destination
+                const flowLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                flowLine.setAttribute('x1', flowX);
+                flowLine.setAttribute('y1', tBusY);
+                flowLine.setAttribute('x2', flowX);
+                flowLine.setAttribute('y2', tBusY - 60);
+                flowLine.setAttribute('stroke', color);
+                flowLine.setAttribute('stroke-width', strokeWidth);
+                svg.appendChild(flowLine);
+            });
+        }
+
+        function drawVerticalDestinationTJunction(svg, destNode, flows, tBusY, bridgeX) {
+            // Calculate horizontal extent for this destination's T-junction (vertical orientation)
+            const flowXPositions = flows.map((flow, index) => bridgeX + (index - flows.length/2) * 40);
+            const minX = Math.min(destNode.x, ...flowXPositions);
+            const maxX = Math.max(destNode.x, ...flowXPositions);
+            
+            // Main vertical line from destination node downward
+            const destLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            destLine.setAttribute('x1', destNode.x);
+            destLine.setAttribute('y1', destNode.y + 30);
+            destLine.setAttribute('x2', destNode.x);
+            destLine.setAttribute('y2', tBusY);
+            destLine.setAttribute('stroke', '#2196f3');
+            destLine.setAttribute('stroke-width', '3');
+            svg.appendChild(destLine);
+            
+            // Horizontal T-junction bus for this destination
+            const horizontalBus = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            horizontalBus.setAttribute('x1', minX);
+            horizontalBus.setAttribute('y1', tBusY);
+            horizontalBus.setAttribute('x2', maxX);
+            horizontalBus.setAttribute('y2', tBusY);
+            horizontalBus.setAttribute('stroke', '#2196f3');
+            horizontalBus.setAttribute('stroke-width', '3');
+            svg.appendChild(horizontalBus);
+            
+            // Individual flow connections from T-junction
+            flows.forEach((flow, index) => {
+                const flowX = bridgeX + (index - (flows.length - 1) / 2) * 40;
+                
+                const riskColors = {
+                    low: '#4caf50',
+                    medium: '#ff9800',
+                    high: '#f44336', 
+                    critical: '#d32f2f'
+                };
+                
+                const color = riskColors[flow.riskLevel] || '#666';
+                const strokeWidth = flow.riskLevel === 'critical' ? 3 : flow.riskLevel === 'high' ? 2 : 1;
+                
+                // Vertical line from T-junction toward source  
+                const flowLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                flowLine.setAttribute('x1', flowX);
+                flowLine.setAttribute('y1', tBusY);
+                flowLine.setAttribute('x2', flowX);
+                flowLine.setAttribute('y2', tBusY + 60);
+                flowLine.setAttribute('stroke', color);
+                flowLine.setAttribute('stroke-width', strokeWidth);
+                flowLine.setAttribute('marker-end', `url(#arrow-${flow.riskLevel})`);
+                svg.appendChild(flowLine);
+            });
+        }
+
+        function drawVerticalFlowBridge(svg, flow, sourceTBusY, destTBusY, bridgeX) {
+            // Draw individual flow bridge connecting source T to destination T (vertical)
+            const riskColors = {
+                low: '#4caf50',
+                medium: '#ff9800',
+                high: '#f44336',
+                critical: '#d32f2f'
+            };
+            
+            const color = riskColors[flow.riskLevel] || '#666';
+            const strokeWidth = flow.riskLevel === 'critical' ? 3 : flow.riskLevel === 'high' ? 2 : 1;
+            
+            // Get flow positions (this needs to match the X positions calculated in T-junction functions)
+            const flowIndex = Math.abs(flow.sourceIP.charCodeAt(flow.sourceIP.length-1) + 
+                                     flow.destIP.charCodeAt(flow.destIP.length-1)) % 10;
+            const flowX = bridgeX + (flowIndex - 5) * 40;
+            
+            // Vertical bridge line connecting source T to destination T
+            const bridgeLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            bridgeLine.setAttribute('x1', flowX);
+            bridgeLine.setAttribute('y1', sourceTBusY - 60);
+            bridgeLine.setAttribute('x2', flowX);
+            bridgeLine.setAttribute('y2', destTBusY + 60);
+            bridgeLine.setAttribute('stroke', color);
+            bridgeLine.setAttribute('stroke-width', strokeWidth);
+            bridgeLine.setAttribute('stroke-dasharray', '8,4');
+            bridgeLine.setAttribute('marker-end', `url(#arrow-${flow.riskLevel})`);
+            svg.appendChild(bridgeLine);
+        }
+
+        function drawBPMNTJunctionConnection(svg, sourceNodes, destNode, flows, laneWidth) {
+            // Create T-junction connection for multiple flows to same destination
+            const destEntryX = destNode.x - 60; // Entry point to destination
+            const junctionX = laneWidth - 40;   // T-junction vertical line position
+            
+            // Main vertical line (stem of the T) - positioned near lane boundary
+            const minSourceY = Math.min(...flows.map(f => sourceNodes.get(f.sourceIP).y));
+            const maxSourceY = Math.max(...flows.map(f => sourceNodes.get(f.sourceIP).y));
+            
+            // Calculate the full vertical extent including destination
+            const allYPositions = [...flows.map(f => sourceNodes.get(f.sourceIP).y), destNode.y];
+            const minY = Math.min(...allYPositions);
+            const maxY = Math.max(...allYPositions);
+            
+            // Draw the main vertical line (T stem) covering all connection points
+            const mainVerticalLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            mainVerticalLine.setAttribute('x1', junctionX);
+            mainVerticalLine.setAttribute('y1', minY);
+            mainVerticalLine.setAttribute('x2', junctionX);
+            mainVerticalLine.setAttribute('y2', maxY);
+            mainVerticalLine.setAttribute('stroke', '#666');
+            mainVerticalLine.setAttribute('stroke-width', '3');
+            svg.appendChild(mainVerticalLine);
+            
+            // Draw horizontal connection from T-junction to destination
+            const destConnectionLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            destConnectionLine.setAttribute('x1', junctionX);
+            destConnectionLine.setAttribute('y1', destNode.y);
+            destConnectionLine.setAttribute('x2', destEntryX);
+            destConnectionLine.setAttribute('y2', destNode.y);
+            destConnectionLine.setAttribute('stroke', '#666');
+            destConnectionLine.setAttribute('stroke-width', '2');
+            svg.appendChild(destConnectionLine);
+            
+            // Final connection to destination node
+            const finalLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            finalLine.setAttribute('x1', destEntryX);
+            finalLine.setAttribute('y1', destNode.y);
+            finalLine.setAttribute('x2', destNode.x - 30);
+            finalLine.setAttribute('y2', destNode.y);
+            finalLine.setAttribute('stroke', '#2196f3');
+            finalLine.setAttribute('stroke-width', '3');
+            finalLine.setAttribute('marker-end', 'url(#arrow-medium)');
+            svg.appendChild(finalLine);
+            
+            // Draw individual source connections to the T-junction
+            flows.forEach((flow, index) => {
+                const sourceNode = sourceNodes.get(flow.sourceIP);
+                if (!sourceNode) return;
+                
+                const riskColors = {
+                    low: '#4caf50',
+                    medium: '#ff9800', 
+                    high: '#f44336',
+                    critical: '#d32f2f'
+                };
+                
+                const color = riskColors[flow.riskLevel] || '#666';
+                const strokeWidth = flow.riskLevel === 'critical' ? 3 : flow.riskLevel === 'high' ? 2 : 1;
+                
+                // Horizontal line from source to T-junction
+                const sourceLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                sourceLine.setAttribute('x1', sourceNode.x + 60);
+                sourceLine.setAttribute('y1', sourceNode.y);
+                sourceLine.setAttribute('x2', junctionX);
+                sourceLine.setAttribute('y2', sourceNode.y);
+                sourceLine.setAttribute('stroke', color);
+                sourceLine.setAttribute('stroke-width', strokeWidth);
+                svg.appendChild(sourceLine);
+                
+                // Add flow label
+                const labelX = (sourceNode.x + 60 + junctionX) / 2;
+                const labelY = sourceNode.y - 10;
+                
+                const labelText = `${flow.protocol}`;
+                const portText = flow.destPort ? `:${flow.destPort}` : '';
+                
+                const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                const textWidth = labelText.length * 6 + portText.length * 4;
+                labelBg.setAttribute('x', labelX - textWidth/2 - 2);
+                labelBg.setAttribute('y', labelY - 6);
+                labelBg.setAttribute('width', textWidth + 4);
+                labelBg.setAttribute('height', 12);
+                labelBg.setAttribute('fill', 'rgba(255,255,255,0.9)');
+                labelBg.setAttribute('stroke', color);
+                labelBg.setAttribute('rx', '2');
+                svg.appendChild(labelBg);
+                
+                const protocolLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                protocolLabel.setAttribute('x', labelX);
+                protocolLabel.setAttribute('y', labelY + 2);
+                protocolLabel.setAttribute('text-anchor', 'middle');
+                protocolLabel.setAttribute('fill', color);
+                protocolLabel.setAttribute('font-size', '9');
+                protocolLabel.setAttribute('font-weight', 'bold');
+                protocolLabel.textContent = labelText + portText;
+                svg.appendChild(protocolLabel);
+            });
+        }
+
+        function drawBPMNFlowConnection(svg, source, dest, flow, laneWidth) {
+            const riskColors = {
+                low: '#4caf50',
+                medium: '#ff9800', 
+                high: '#f44336',
+                critical: '#d32f2f'
+            };
+            
+            const color = riskColors[flow.riskLevel] || '#666';
+            const strokeWidth = flow.riskLevel === 'critical' ? 4 : flow.riskLevel === 'high' ? 3 : 2;
+            
+            // BPMN-style horizontal connection across lanes
+            const sourceExitX = source.x + 60; // Exit point from source node
+            const destEntryX = dest.x - 60;    // Entry point to destination node
+            const connectionY = (source.y + dest.y) / 2; // Midpoint for horizontal bridge
+            
+            // Connection path: source -> exit horizontally -> bridge vertically -> entry horizontally -> destination
+            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            
+            const pathData = `
+                M ${source.x + 30} ${source.y}
+                L ${sourceExitX} ${source.y}
+                L ${sourceExitX} ${connectionY}
+                L ${destEntryX} ${connectionY}
+                L ${destEntryX} ${dest.y}
+                L ${dest.x - 30} ${dest.y}
+            `;
+            
+            path.setAttribute('d', pathData);
+            path.setAttribute('stroke', color);
+            path.setAttribute('stroke-width', strokeWidth);
+            path.setAttribute('fill', 'none');
+            path.setAttribute('marker-end', `url(#arrow-${flow.riskLevel})`);
+            svg.appendChild(path);
+            
+            // Add protocol label on the horizontal bridge
+            const labelX = (sourceExitX + destEntryX) / 2;
+            const labelY = connectionY;
+            
+            const labelText = `${flow.protocol}`;
+            const portText = flow.destPort ? `:${flow.destPort}` : '';
+            
+            const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            const textWidth = labelText.length * 7 + portText.length * 5;
+            labelBg.setAttribute('x', labelX - textWidth/2 - 3);
+            labelBg.setAttribute('y', labelY - 8);
+            labelBg.setAttribute('width', textWidth + 6);
+            labelBg.setAttribute('height', 16);
+            labelBg.setAttribute('fill', 'rgba(255,255,255,0.95)');
+            labelBg.setAttribute('stroke', color);
+            labelBg.setAttribute('rx', '3');
+            svg.appendChild(labelBg);
+            
+            const protocolLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            protocolLabel.setAttribute('x', labelX);
+            protocolLabel.setAttribute('y', labelY + 4);
+            protocolLabel.setAttribute('text-anchor', 'middle');
+            protocolLabel.setAttribute('fill', color);
+            protocolLabel.setAttribute('font-size', '12');
+            protocolLabel.setAttribute('font-weight', 'bold');
+            protocolLabel.textContent = labelText + portText;
+            svg.appendChild(protocolLabel);
+        }
+
+        function drawBPMNNode(svg, node, color, type) {
+            // BPMN-style rounded rectangle nodes
+            const width = 120;
+            const height = 60;
+            
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.style.cursor = 'pointer';
+            g.setAttribute('data-clickable', 'true');
+            g.setAttribute('data-type', type);
+            
+            // Main node rectangle with BPMN styling
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', node.x - width/2);
+            rect.setAttribute('y', node.y - height/2);
+            rect.setAttribute('width', width);
+            rect.setAttribute('height', height);
+            rect.setAttribute('rx', '10');
+            rect.setAttribute('ry', '10');
+            rect.setAttribute('fill', 'rgba(255,255,255,0.95)');
+            rect.setAttribute('stroke', color);
+            rect.setAttribute('stroke-width', '2');
+            rect.setAttribute('filter', 'drop-shadow(2px 2px 4px rgba(0,0,0,0.1))');
+            g.appendChild(rect);
+            
+            // Node text
+            const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+            text.setAttribute('x', node.x);
+            text.setAttribute('y', node.y + 5);
+            text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('fill', color);
+            text.setAttribute('font-size', '12');
+            text.setAttribute('font-weight', 'bold');
+            text.textContent = node.ip;
+            g.appendChild(text);
+            
+            // Connection count badge
+            if (node.connections > 0) {
+                const badge = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                badge.setAttribute('cx', node.x + width/2 - 10);
+                badge.setAttribute('cy', node.y - height/2 + 10);
+                badge.setAttribute('r', '10');
+                badge.setAttribute('fill', color);
+                g.appendChild(badge);
+                
+                const badgeText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                badgeText.setAttribute('x', node.x + width/2 - 10);
+                badgeText.setAttribute('y', node.y - height/2 + 14);
+                badgeText.setAttribute('text-anchor', 'middle');
+                badgeText.setAttribute('fill', 'white');
+                badgeText.setAttribute('font-size', '10');
+                badgeText.setAttribute('font-weight', 'bold');
+                badgeText.textContent = node.connections;
+                g.appendChild(badgeText);
+            }
+            
+            svg.appendChild(g);
         }
 
         function drawServerCartography(svg, width, height, flows) {
