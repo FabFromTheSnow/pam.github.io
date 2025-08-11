@@ -1724,38 +1724,94 @@
                 critical: '#d32f2f'
             };
             
-            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-            line.setAttribute('x1', source.x);
-            line.setAttribute('y1', source.y);
-            line.setAttribute('x2', dest.x);
-            line.setAttribute('y2', dest.y);
-            line.setAttribute('stroke', riskColors[flow.riskLevel] || '#666');
-            line.setAttribute('stroke-width', flow.riskLevel === 'critical' ? 4 : flow.riskLevel === 'high' ? 3 : 2);
-            line.setAttribute('marker-end', `url(#arrow-${flow.riskLevel})`);
-            svg.appendChild(line);
+            const color = riskColors[flow.riskLevel] || '#666';
+            const strokeWidth = flow.riskLevel === 'critical' ? 4 : flow.riskLevel === 'high' ? 3 : 2;
+            
+            // Create double T-style connection for professional network diagram look
+            // Calculate connection points for better routing
+            const sourceExtendDistance = 60; // Distance to extend from source
+            const destExtendDistance = 60;   // Distance to extend from destination
+            
+            // Key junction points
+            const sourceJunctionX = source.x + sourceExtendDistance;
+            const destJunctionX = dest.x - destExtendDistance;
+            const midY = (source.y + dest.y) / 2; // Horizontal bus level
+            
+            // Line 1: Horizontal extension from source (first part of first T)
+            const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line1.setAttribute('x1', source.x);
+            line1.setAttribute('y1', source.y);
+            line1.setAttribute('x2', sourceJunctionX);
+            line1.setAttribute('y2', source.y);
+            line1.setAttribute('stroke', color);
+            line1.setAttribute('stroke-width', strokeWidth);
+            svg.appendChild(line1);
+            
+            // Line 2: Vertical from source level to bus level (vertical part of first T)
+            const line2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line2.setAttribute('x1', sourceJunctionX);
+            line2.setAttribute('y1', source.y);
+            line2.setAttribute('x2', sourceJunctionX);
+            line2.setAttribute('y2', midY);
+            line2.setAttribute('stroke', color);
+            line2.setAttribute('stroke-width', strokeWidth);
+            svg.appendChild(line2);
+            
+            // Line 3: Horizontal bus line connecting the two T-junctions
+            const line3 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line3.setAttribute('x1', sourceJunctionX);
+            line3.setAttribute('y1', midY);
+            line3.setAttribute('x2', destJunctionX);
+            line3.setAttribute('y2', midY);
+            line3.setAttribute('stroke', color);
+            line3.setAttribute('stroke-width', strokeWidth);
+            svg.appendChild(line3);
+            
+            // Line 4: Vertical from bus level to destination level (vertical part of second T)
+            const line4 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line4.setAttribute('x1', destJunctionX);
+            line4.setAttribute('y1', midY);
+            line4.setAttribute('x2', destJunctionX);
+            line4.setAttribute('y2', dest.y);
+            line4.setAttribute('stroke', color);
+            line4.setAttribute('stroke-width', strokeWidth);
+            svg.appendChild(line4);
+            
+            // Line 5: Final horizontal to destination with arrow (second part of second T)
+            const line5 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line5.setAttribute('x1', destJunctionX);
+            line5.setAttribute('y1', dest.y);
+            line5.setAttribute('x2', dest.x);
+            line5.setAttribute('y2', dest.y);
+            line5.setAttribute('stroke', color);
+            line5.setAttribute('stroke-width', strokeWidth);
+            line5.setAttribute('marker-end', `url(#arrow-${flow.riskLevel})`);
+            svg.appendChild(line5);
 
-            const midX = (source.x + dest.x) / 2;
-            const midY = (source.y + dest.y) / 2;
+            // Calculate best position for label (on the horizontal bus line)
+            const labelX = (sourceJunctionX + destJunctionX) / 2;
+            const labelY = midY;
             
             const labelText = `${flow.protocol}`;
             const portText = flow.destPort ? `:${flow.destPort}` : '';
             
+            // Position label on the horizontal bus line between the T-junctions
             const labelBg = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
             const textWidth = labelText.length * 7 + portText.length * 5;
-            labelBg.setAttribute('x', midX - textWidth/2 - 3);
-            labelBg.setAttribute('y', midY - 14);
+            labelBg.setAttribute('x', labelX - textWidth/2 - 3);
+            labelBg.setAttribute('y', labelY - 6);
             labelBg.setAttribute('width', textWidth + 6);
             labelBg.setAttribute('height', 12);
             labelBg.setAttribute('fill', 'rgba(255,255,255,0.95)');
-            labelBg.setAttribute('stroke', riskColors[flow.riskLevel] || '#666');
+            labelBg.setAttribute('stroke', color);
             labelBg.setAttribute('rx', '3');
             svg.appendChild(labelBg);
             
             const protocolLabel = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            protocolLabel.setAttribute('x', midX);
-            protocolLabel.setAttribute('y', midY - 5);
+            protocolLabel.setAttribute('x', labelX);
+            protocolLabel.setAttribute('y', labelY + 3);
             protocolLabel.setAttribute('text-anchor', 'middle');
-            protocolLabel.setAttribute('fill', riskColors[flow.riskLevel] || '#666');
+            protocolLabel.setAttribute('fill', color);
             protocolLabel.setAttribute('font-size', '10');
             protocolLabel.setAttribute('font-weight', 'bold');
             protocolLabel.textContent = labelText + portText;
