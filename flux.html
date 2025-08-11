@@ -302,6 +302,40 @@
             color: white;
         }
 
+        .node-context-menu {
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 2000;
+            min-width: 180px;
+            display: none;
+        }
+
+        .node-context-menu .menu-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .node-context-menu .menu-item:hover {
+            background: #f5f5f5;
+        }
+
+        .node-context-menu .menu-item:last-child {
+            border-bottom: none;
+        }
+
+        .node-context-menu .menu-item .icon {
+            font-size: 14px;
+            width: 16px;
+        }
+
         @media (max-width: 768px) {
             .container {
                 flex-direction: column;
@@ -395,6 +429,26 @@
             <div class="canvas-container">
                 <svg id="networkCanvas"></svg>
             </div>
+        </div>
+    </div>
+
+    <!-- Menu contextuel pour les noeuds -->
+    <div id="nodeContextMenu" class="node-context-menu">
+        <div class="menu-item" onclick="createFlowFromNode()">
+            <span class="icon">➕</span>
+            <span>Créer flux depuis ce nœud</span>
+        </div>
+        <div class="menu-item" onclick="createFlowToNode()">
+            <span class="icon">⬅️</span>
+            <span>Créer flux vers ce nœud</span>
+        </div>
+        <div class="menu-item" onclick="showNodeFlows()">
+            <span class="icon">🔍</span>
+            <span>Voir tous les flux</span>
+        </div>
+        <div class="menu-item" onclick="filterByNode()">
+            <span class="icon">🔽</span>
+            <span>Filtrer par ce nœud</span>
         </div>
     </div>
 
@@ -666,6 +720,83 @@
         let dragStart = { x: 0, y: 0 };
         let currentViewId = 'default';
         let editingViewId = null;
+        let selectedNodeIP = null;
+        let selectedNodeType = null;
+
+        function showNodeContextMenu(event, node, type) {
+            selectedNodeIP = node.ip;
+            selectedNodeType = type;
+            
+            const menu = document.getElementById('nodeContextMenu');
+            menu.style.display = 'block';
+            menu.style.left = event.pageX + 'px';
+            menu.style.top = event.pageY + 'px';
+            
+            // Fermer le menu si on clique ailleurs
+            setTimeout(() => {
+                document.addEventListener('click', hideNodeContextMenu, { once: true });
+            }, 10);
+        }
+
+        function hideNodeContextMenu() {
+            document.getElementById('nodeContextMenu').style.display = 'none';
+        }
+
+        function createFlowFromNode() {
+            hideNodeContextMenu();
+            document.getElementById('sourceIP').value = selectedNodeIP;
+            resetModalToAddMode();
+            openFlowModal();
+        }
+
+        function createFlowToNode() {
+            hideNodeContextMenu();
+            document.getElementById('destIP').value = selectedNodeIP;
+            resetModalToAddMode();
+            openFlowModal();
+        }
+
+        function showNodeFlows() {
+            hideNodeContextMenu();
+            const nodeFlows = getCurrentFlows().filter(flow => 
+                flow.sourceIP === selectedNodeIP || flow.destIP === selectedNodeIP
+            );
+            
+            if (nodeFlows.length === 0) {
+                alert(`Aucun flux trouvé pour ${selectedNodeIP}`);
+                return;
+            }
+
+            let message = `Flux pour ${selectedNodeIP} :\n\n`;
+            nodeFlows.forEach((flow, index) => {
+                const direction = flow.sourceIP === selectedNodeIP ? '→' : '←';
+                const otherIP = flow.sourceIP === selectedNodeIP ? flow.destIP : flow.sourceIP;
+                message += `${index + 1}. ${flow.name}\n   ${direction} ${otherIP} (${flow.protocol}:${flow.destPort || 'Auto'})\n   Risque: ${getRiskLabel(flow.riskLevel)}\n\n`;
+            });
+            
+            alert(message);
+        }
+
+        function filterByNode() {
+            hideNodeContextMenu();
+            // Mettre en évidence les flux associés à ce nœud
+            const flowList = document.getElementById('flowList');
+            const flowItems = flowList.querySelectorAll('.flow-item');
+            
+            flowItems.forEach(item => {
+                const flowText = item.textContent.toLowerCase();
+                if (flowText.includes(selectedNodeIP.toLowerCase())) {
+                    item.style.background = '#e3f2fd';
+                    item.style.borderLeft = '4px solid #2196f3';
+                } else {
+                    item.style.background = '';
+                    item.style.borderLeft = '4px solid #667eea';
+                }
+            });
+            
+            // Scroll vers la liste des flux
+            flowList.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
 
         function init() {
             svgElement = document.getElementById('networkCanvas');
@@ -821,7 +952,16 @@
 
         function closeFlowModal() {
             document.getElementById('flowModal').style.display = 'none';
+            resetModalToAddMode();
             clearModalInputs();
+        }
+
+        function resetModalToAddMode() {
+            const addButton = document.querySelector('#flowModal button[onclick*="Flow"]');
+            if (addButton) {
+                addButton.textContent = 'Ajouter le Flux';
+                addButton.onclick = function() { addFlow(); };
+            }
         }
 
         function openNewViewModal() {
@@ -985,6 +1125,121 @@
             }
 
             appData.networkFlows.push(flow);
+            appData.metadata.lastModified = new Date().toISOString();
+            closeFlowModal();
+            updateDisplay();
+            saveToStorage();
+        }
+
+        function editFlow(id) {
+            const flow = appData.networkFlows.find(f => f.id == id);
+            if (!flow) {
+                alert('Flux introuvable');
+                return;
+            }
+            
+            // Remplir le modal avec les données existantes
+            document.getElementById('flowName').value = flow.name;
+            document.getElementById('protocol').value = flow.protocol;
+            document.getElementById('sourceIP').value = flow.sourceIP;
+            document.getElementById('sourcePort').value = flow.sourcePort || '';
+            document.getElementById('destIP').value = flow.destIP;
+            document.getElementById('destPort').value = flow.destPort || '';
+            document.getElementById('riskLevel').value = flow.riskLevel;
+            document.getElementById('description').value = flow.description || '';
+            document.getElementById('businessJustification').value = flow.businessJustification || '';
+            document.getElementById('flowView').value = flow.viewId;
+            
+            // Gérer les variants
+            if (flow.variantType) {
+                document.getElementById('variantType').value = flow.variantType;
+                document.getElementById('variantJustification').value = flow.variantJustification || '';
+                if (flow.replacedFlowId) {
+                    document.getElementById('replacedFlowId').value = flow.replacedFlowId;
+                }
+                if (flow.cancelledFlowId) {
+                    document.getElementById('cancelledFlowId').value = flow.cancelledFlowId;
+                }
+            }
+            
+            toggleVariantFields();
+            toggleVariantOptions();
+            
+            // Modifier le bouton pour l'édition
+            const addButton = document.querySelector('#flowModal button[onclick="addFlow()"]');
+            addButton.textContent = 'Modifier le Flux';
+            addButton.onclick = function() { updateFlow(id); };
+            
+            openFlowModal();
+        }
+
+        function updateFlow(id) {
+            const flow = appData.networkFlows.find(f => f.id == id);
+            if (!flow) {
+                alert('Flux introuvable');
+                return;
+            }
+
+            const viewId = document.getElementById('flowView').value;
+            const variantType = document.getElementById('variantType').value;
+            
+            // Mise à jour des données
+            flow.viewId = viewId;
+            flow.name = document.getElementById('flowName').value;
+            flow.protocol = document.getElementById('protocol').value;
+            flow.sourceIP = document.getElementById('sourceIP').value;
+            flow.sourcePort = document.getElementById('sourcePort').value;
+            flow.destIP = document.getElementById('destIP').value;
+            flow.destPort = document.getElementById('destPort').value;
+            flow.riskLevel = document.getElementById('riskLevel').value;
+            flow.description = document.getElementById('description').value;
+            flow.businessJustification = document.getElementById('businessJustification').value;
+
+            // Ajouter les informations de variant si nécessaire
+            if (viewId !== 'default' && variantType) {
+                flow.variantType = variantType;
+                flow.variantJustification = document.getElementById('variantJustification').value;
+                
+                if (variantType === 'replacement') {
+                    flow.replacedFlowId = document.getElementById('replacedFlowId').value;
+                } else if (variantType === 'cancellation') {
+                    flow.cancelledFlowId = document.getElementById('cancelledFlowId').value;
+                }
+            } else {
+                // Nettoyer les propriétés variant si pas nécessaire
+                delete flow.variantType;
+                delete flow.variantJustification;
+                delete flow.replacedFlowId;
+                delete flow.cancelledFlowId;
+            }
+
+            // Validations (même logique que addFlow)
+            if (variantType === 'cancellation') {
+                if (!flow.cancelledFlowId) {
+                    alert('Veuillez sélectionner le flux à annuler.');
+                    return;
+                }
+                if (!flow.variantJustification.trim()) {
+                    alert('Veuillez justifier l\'annulation de ce flux.');
+                    return;
+                }
+            } else {
+                if (!flow.name || !flow.sourceIP || !flow.destIP) {
+                    alert('Veuillez remplir au minimum le nom, l\'IP source et l\'IP destination.');
+                    return;
+                }
+            }
+            
+            if (variantType === 'replacement' && !flow.replacedFlowId) {
+                alert('Veuillez sélectionner le flux à remplacer.');
+                return;
+            }
+            
+            if (variantType && !flow.variantJustification.trim()) {
+                alert('Veuillez justifier cette modification.');
+                return;
+            }
+
             appData.metadata.lastModified = new Date().toISOString();
             closeFlowModal();
             updateDisplay();
@@ -1239,7 +1494,10 @@
                         <p style="opacity: 0.7;"><span class="risk-indicator ${riskClass}"></span><span class="protocol-tag ${protocolClass}">${cancelledFlow ? cancelledFlow.protocol : 'N/A'}</span></p>
                         <p style="opacity: 0.7;"><strong>Flux annulé de la vue par défaut</strong></p>
                         ${variantInfo}
-                        <button onclick="deleteFlow(${flow.id})" style="background: #f44336; color: white; border: none; padding: 3px 6px; border-radius: 3px; cursor: pointer; float: right; margin-top: 3px; font-size: 10px;">×</button>
+                        <div style="float: right; margin-top: 3px;">
+                            <button onclick="editFlow(${flow.id})" style="background: #4caf50; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px; font-size: 10px;">✏️</button>
+                            <button onclick="deleteFlow(${flow.id})" style="background: #f44336; color: white; border: none; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-size: 10px;">×</button>
+                        </div>
                     `;
                 } else {
                     flowElement.innerHTML = `
@@ -1249,7 +1507,10 @@
                         <p><strong>Dest:</strong> ${flow.destIP}:${flow.destPort || 'Auto'}</p>
                         <p><strong>Risque:</strong> ${getRiskLabel(flow.riskLevel)}</p>
                         ${variantInfo}
-                        <button onclick="deleteFlow(${flow.id})" style="background: #f44336; color: white; border: none; padding: 3px 6px; border-radius: 3px; cursor: pointer; float: right; margin-top: 3px; font-size: 10px;">×</button>
+                        <div style="float: right; margin-top: 3px;">
+                            <button onclick="editFlow(${flow.id})" style="background: #4caf50; color: white; border: none; padding: 3px 8px; border-radius: 3px; cursor: pointer; margin-right: 4px; font-size: 10px;">✏️</button>
+                            <button onclick="deleteFlow(${flow.id})" style="background: #f44336; color: white; border: none; padding: 3px 6px; border-radius: 3px; cursor: pointer; font-size: 10px;">×</button>
+                        </div>
                     `;
                 }
                 
@@ -1508,6 +1769,13 @@
             const radiusPerChar = 4;
             const nodeSize = Math.max(minRadius, textLength * radiusPerChar);
             
+            // Créer un groupe pour le noeud
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.style.cursor = 'pointer';
+            g.setAttribute('class', 'network-node');
+            g.setAttribute('data-ip', node.ip);
+            g.setAttribute('data-type', type);
+            
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse');
             circle.setAttribute('cx', node.x);
             circle.setAttribute('cy', node.y);
@@ -1516,7 +1784,7 @@
             circle.setAttribute('fill', 'rgba(255,255,255,0.95)');
             circle.setAttribute('stroke', color);
             circle.setAttribute('stroke-width', '2');
-            svg.appendChild(circle);
+            g.appendChild(circle);
 
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             text.setAttribute('x', node.x);
@@ -1526,7 +1794,26 @@
             text.setAttribute('font-size', Math.max(8, Math.min(11, 60 / textLength)));
             text.setAttribute('font-weight', 'bold');
             text.textContent = node.ip;
-            svg.appendChild(text);
+            g.appendChild(text);
+
+            // Ajouter le gestionnaire de clic pour le menu contextuel
+            g.addEventListener('click', function(e) {
+                e.stopPropagation();
+                showNodeContextMenu(e, node, type);
+            });
+
+            // Effet hover
+            g.addEventListener('mouseenter', function() {
+                circle.setAttribute('stroke-width', '3');
+                circle.setAttribute('fill', 'rgba(255,255,255,1)');
+            });
+            
+            g.addEventListener('mouseleave', function() {
+                circle.setAttribute('stroke-width', '2');
+                circle.setAttribute('fill', 'rgba(255,255,255,0.95)');
+            });
+            
+            svg.appendChild(g);
         }
 
         function getUniqueSourceIPs(flows) {

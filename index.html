@@ -950,6 +950,17 @@ const svg = document.getElementById('svgCanvas');
 
 // Gestionnaire de clic sur zone vide pour ajout rapide
 svg.addEventListener('click', (e) => {
+    // Check for clickable elements first (event delegation for pagination)
+    const clickableElement = e.target.closest('[data-clickable="true"]');
+    if (clickableElement) {
+        const elementId = clickableElement.getAttribute('data-element-id');
+        if (elementId && elementClickHandlers.has(elementId)) {
+            const handler = elementClickHandlers.get(elementId);
+            handler(e);
+            return;
+        }
+    }
+    
     // Vérifier que ce n'est pas un clic sur un élément existant
     if (e.target === svg) {
         const rect = svg.getBoundingClientRect();
@@ -967,13 +978,22 @@ let currentPage = 1;
 let serversPerPage = 6; // Nombre de serveurs par page
 let maxTotalPages = 1;
 
+// Map to store click handlers for pagination persistence
+let elementClickHandlers = new Map();
+
 // ==== Fonctions modales et ajout (JavaScript original conservé) ====
 function openAddServerModal() {
     currentServerId = null; // Reset pour mode ajout
     document.getElementById('serverName').value = "";
     populateSelect('serverOS', data.settings.osList, true);
     populateSelect('serverSoftware', data.settings.softwareList, true);
-    document.getElementById('serverModal').style.display = 'flex';
+    
+    // Réinitialiser le titre et le bouton pour le mode ajout
+    const modal = document.getElementById('serverModal');
+    modal.querySelector('h3').textContent = '🖥️ Ajouter un serveur';
+    modal.querySelector('button[onclick="confirmAddServer()"]').textContent = 'Ajouter le serveur';
+    
+    modal.style.display = 'flex';
     updateConnectionIndicator('Ajout d\'un serveur...');
 }
 
@@ -1032,7 +1052,13 @@ function openAddAccountModal(serverId) {
     populateSelect('accountTypeAccess', data.settings.typeAccessList, true);
     populateSelect('accountAuthMethod', data.settings.authMethodList, true);
     populateSelect('accountType', data.settings.typeAccountList, true);
-    document.getElementById('accountModal').style.display = 'flex';
+    
+    // Réinitialiser le titre et le bouton pour le mode ajout
+    const modal = document.getElementById('accountModal');
+    modal.querySelector('h3').textContent = '👤 Ajouter un compte';
+    modal.querySelector('button[onclick="confirmAddAccount()"]').textContent = 'Ajouter le compte';
+    
+    modal.style.display = 'flex';
     updateConnectionIndicator('Ajout d\'un compte...');
 }
 
@@ -1106,8 +1132,13 @@ function openEditServerModal(serverId) {
     populateSelect('serverOS', data.settings.osList, true, server.os);
     populateSelect('serverSoftware', data.settings.softwareList, true, server.software);
     
+    // Changer le titre et le bouton pour le mode édition
+    const modal = document.getElementById('serverModal');
+    modal.querySelector('h3').textContent = '✏️ Modifier le serveur';
+    modal.querySelector('button[onclick="confirmAddServer()"]').textContent = 'Modifier le serveur';
+    
     currentServerId = serverId;
-    document.getElementById('serverModal').style.display = 'flex';
+    modal.style.display = 'flex';
     updateConnectionIndicator('Modification serveur...');
 }
 
@@ -1125,7 +1156,12 @@ function openEditAccountModal(serverId, accountId) {
     populateSelect('accountAuthMethod', data.settings.authMethodList, true, account.authMethod);
     populateSelect('accountType', data.settings.typeAccountList, true, account.typeAccount);
     
-    document.getElementById('accountModal').style.display = 'flex';
+    // Changer le titre et le bouton pour le mode édition
+    const modal = document.getElementById('accountModal');
+    modal.querySelector('h3').textContent = '✏️ Modifier le compte';
+    modal.querySelector('button[onclick="confirmAddAccount()"]').textContent = 'Modifier le compte';
+    
+    modal.style.display = 'flex';
     updateConnectionIndicator('Modification compte...');
 }
 
@@ -1145,7 +1181,12 @@ function openEditIdentityModal(serverId, accountId, identityId) {
     document.getElementById('identityLastReview').value = identity.lastReview;
     document.getElementById('identityNextReview').value = identity.nextReview;
     
-    document.getElementById('identityModal').style.display = 'flex';
+    // Changer le titre et le bouton pour le mode édition
+    const modal = document.getElementById('identityModal');
+    modal.querySelector('h3').textContent = '✏️ Modifier l\'identité';
+    modal.querySelector('button[onclick="confirmAddIdentity()"]').textContent = 'Modifier l\'identité';
+    
+    modal.style.display = 'flex';
     updateConnectionIndicator('Modification identité...');
 }
 function openAddIdentityModal(serverId, accountId) {
@@ -1157,7 +1198,13 @@ function openAddIdentityModal(serverId, accountId) {
     populateSelect('identityJustification', data.settings.justificationList, true);
     document.getElementById('identityLastReview').value = "";
     document.getElementById('identityNextReview').value = "";
-    document.getElementById('identityModal').style.display = 'flex';
+    
+    // Réinitialiser le titre et le bouton pour le mode ajout
+    const modal = document.getElementById('identityModal');
+    modal.querySelector('h3').textContent = '🔐 Ajouter une identité';
+    modal.querySelector('button[onclick="confirmAddIdentity()"]').textContent = 'Ajouter l\'identité';
+    
+    modal.style.display = 'flex';
     updateConnectionIndicator('Ajout d\'une identité...');
 }
 
@@ -1345,6 +1392,9 @@ function populateSelect(id, items, addEmpty, selectedValue) {
 
 // ==== Rendu avec pagination et flèches en T ====
 function render() {
+    // Clear previous click handlers to avoid memory leaks
+    elementClickHandlers.clear();
+    
     svg.innerHTML = `
         <defs>
             <linearGradient id="serverGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1528,7 +1578,7 @@ function render() {
         if (server.software) serverLabel += `\n${server.software}`;
         
         drawNode(serverCenterX, serverY, serverLabel, 'server', 
-                () => showContextMenu('server', server.id, null, null, serverCenterX, serverY), 
+                (e, mouseX, mouseY) => showContextMenu('server', server.id, null, null, mouseX || serverCenterX, mouseY || serverY), 
                 () => deleteNode('server', server.id));
 
         // === PHASE 2.5: DESSINER LES CONNEXIONS VERS LES COMPTES ===
@@ -1563,7 +1613,7 @@ function render() {
             if (account.typeAccount) accountLabel += `\n${account.typeAccount}`;
             
             drawNode(accountX, accountY, accountLabel, 'account',
-                    () => showContextMenu('account', server.id, account.id, null, accountX, accountY),
+                    (e, mouseX, mouseY) => showContextMenu('account', server.id, account.id, null, mouseX || accountX, mouseY || accountY),
                     () => deleteNode('account', server.id, account.id));
             
             // Position des identités avec espacement amélioré
@@ -1600,7 +1650,7 @@ function render() {
                     
                     // Dessiner l'identité avec menu contextuel
                     drawNode(identityX, identityY, identityLabel, 'identity', 
-                            () => showContextMenu('identity', server.id, account.id, identity.id, identityX, identityY),
+                            (e, mouseX, mouseY) => showContextMenu('identity', server.id, account.id, identity.id, mouseX || identityX, mouseY || identityY),
                             () => deleteNode('identity', server.id, account.id, identity.id));
                 });
             }
@@ -1641,7 +1691,31 @@ function drawNode(x, y, text, type, onClick, onDelete) {
     rect.setAttribute("height", height);
     rect.setAttribute("rx", 12);
     rect.setAttribute("class", type);
-    if (onClick) rect.addEventListener('click', onClick);
+    if (onClick) {
+        // Generate unique ID for this element
+        const elementId = `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // Add data attributes for click handling
+        g.setAttribute('data-clickable', 'true');
+        g.setAttribute('data-type', type);
+        g.setAttribute('data-element-id', elementId);
+        rect.setAttribute('data-clickable', 'true');
+        rect.setAttribute('data-type', type);
+        rect.setAttribute('data-element-id', elementId);
+        
+        // Store the click handler in our map
+        elementClickHandlers.set(elementId, function(e) {
+            e.stopPropagation();
+            console.log(`Clicked on ${type} element (ID: ${elementId})`); // Debug log
+            
+            // Calculate the correct mouse position relative to the page
+            const mouseX = e.clientX;
+            const mouseY = e.clientY;
+            
+            // Call onClick with the actual mouse event for proper positioning
+            onClick(e, mouseX, mouseY);
+        });
+    }
     g.appendChild(rect);
     
     // Amélioration du rendu du texte avec meilleur espacement
@@ -1659,6 +1733,16 @@ function drawNode(x, y, text, type, onClick, onDelete) {
         }
         
         label.textContent = displayText;
+        
+        // Add click handler to text as well for better UX
+        if (onClick) {
+            const elementId = g.getAttribute('data-element-id');
+            label.style.cursor = 'pointer';
+            label.setAttribute('data-clickable', 'true');
+            label.setAttribute('data-type', type);
+            label.setAttribute('data-element-id', elementId);
+        }
+        
         g.appendChild(label);
     });
     
@@ -2744,10 +2828,9 @@ function showContextMenu(elementType, serverId, accountId, identityId, x, y) {
         font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     `;
     
-    const container = document.getElementById('container');
-    const rect = container.getBoundingClientRect();
-    menu.style.left = (rect.left + x + 20) + 'px';
-    menu.style.top = (rect.top + y - 10) + 'px';
+    // Use direct mouse coordinates for better positioning
+    menu.style.left = (x + 10) + 'px';
+    menu.style.top = (y - 10) + 'px';
     
     const options = [];
     
@@ -2808,6 +2891,21 @@ function showContextMenu(elementType, serverId, accountId, identityId, x, y) {
     });
     
     document.body.appendChild(menu);
+    
+    // Prevent menu from going off-screen
+    const menuRect = menu.getBoundingClientRect();
+    const windowWidth = window.innerWidth;
+    const windowHeight = window.innerHeight;
+    
+    // Adjust horizontal position if menu would go off right edge
+    if (menuRect.right > windowWidth) {
+        menu.style.left = (x - menuRect.width - 10) + 'px';
+    }
+    
+    // Adjust vertical position if menu would go off bottom edge
+    if (menuRect.bottom > windowHeight) {
+        menu.style.top = (y - menuRect.height - 10) + 'px';
+    }
     
     const closeMenu = (e) => {
         if (!menu.contains(e.target)) {
