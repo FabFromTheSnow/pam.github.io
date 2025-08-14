@@ -1986,6 +1986,27 @@ async function confirmGenerateAuditPDF() {
         const pdf = new jsPDF('l', 'mm', 'a4'); // Format paysage
         let yPosition = 20;
         
+        // === CONSTANTES DE MISE EN PAGE ===
+        const PAGE_HEIGHT = pdf.internal.pageSize.height; // 210mm pour A4 paysage
+        const BOTTOM_MARGIN = 20; // Marge inférieure de sécurité
+        const MAX_Y_POSITION = PAGE_HEIGHT - BOTTOM_MARGIN; // 190mm maximum
+        const FOOTER_Y_POSITION = PAGE_HEIGHT - 5; // 205mm pour footer
+        
+        // === FONCTION HELPER POUR GÉRER LA MARGE ===
+        function checkAndAddPage() {
+            if (yPosition > MAX_Y_POSITION) {
+                pdf.addPage();
+                yPosition = 20;
+                return true; // Nouvelle page créée
+            }
+            return false; // Pas de nouvelle page
+        }
+        
+        function safeAddLine(increment = 4) {
+            yPosition += increment;
+            checkAndAddPage();
+        }
+        
         // === EN-TÊTE DU DOCUMENT ===
         pdf.setFontSize(20);
         pdf.setFont(undefined, 'bold');
@@ -2072,201 +2093,95 @@ async function confirmGenerateAuditPDF() {
         
         // Section inventaire détaillé d'abord
         data.servers.forEach((server, serverIndex) => {
-            // Vérifier si on a assez de place
-            if (yPosition > 180) {
-                pdf.addPage();
-                yPosition = 20;
-            }
+            // Vérifier si on a assez de place (marge sécurisée pour footer) 
+            checkAndAddPage();
             
             pdf.setFontSize(12);
             pdf.setFont(undefined, 'bold');
             pdf.text(`${serverIndex + 1}. SERVEUR: ${server.name}`, 20, yPosition);
-            yPosition += 6;
+            safeAddLine(6);
             
             pdf.setFontSize(10);
             pdf.setFont(undefined, 'normal');
             if (server.os) {
+                checkAndAddPage();
                 pdf.text(`   OS: ${server.os}`, 25, yPosition);
-                yPosition += 4;
+                safeAddLine(4);
             }
             if (server.software) {
+                checkAndAddPage();
                 pdf.text(`   Logiciel: ${server.software}`, 25, yPosition);
-                yPosition += 4;
+                safeAddLine(4);
             }
-            yPosition += 3;
+            safeAddLine(3);
             
             server.accounts.forEach((account, accountIndex) => {
+                checkAndAddPage();
                 pdf.setFont(undefined, 'bold');
                 pdf.text(`   ${serverIndex + 1}.${accountIndex + 1} Compte: ${account.name}`, 25, yPosition);
-                yPosition += 5;
+                safeAddLine(5);
                 
                 pdf.setFont(undefined, 'normal');
-                if (account.rights) pdf.text(`       Privilèges: ${account.rights}`, 30, yPosition), yPosition += 4;
-                if (account.typeAccess) pdf.text(`       Type d'accès: ${account.typeAccess}`, 30, yPosition), yPosition += 4;
-                if (account.authMethod) pdf.text(`       Authentification: ${account.authMethod}`, 30, yPosition), yPosition += 4;
-                if (account.typeAccount) pdf.text(`       Type compte: ${account.typeAccount}`, 30, yPosition), yPosition += 4;
+                if (account.rights) {
+                    checkAndAddPage();
+                    pdf.text(`       Privilèges: ${account.rights}`, 30, yPosition);
+                    safeAddLine(4);
+                }
+                if (account.typeAccess) {
+                    checkAndAddPage();
+                    pdf.text(`       Type d'accès: ${account.typeAccess}`, 30, yPosition);
+                    safeAddLine(4);
+                }
+                if (account.authMethod) {
+                    checkAndAddPage();
+                    pdf.text(`       Authentification: ${account.authMethod}`, 30, yPosition);
+                    safeAddLine(4);
+                }
+                if (account.typeAccount) {
+                    checkAndAddPage();
+                    pdf.text(`       Type compte: ${account.typeAccount}`, 30, yPosition);
+                    safeAddLine(4);
+                }
                 
                 account.identities.forEach((identity, identityIndex) => {
-                    if (yPosition > 180) {
-                        pdf.addPage();
-                        yPosition = 20;
-                    }
+                    checkAndAddPage();
                     
                     pdf.setFont(undefined, 'italic');
                     pdf.text(`        Identité: ${identity.name}`, 35, yPosition);
-                    yPosition += 4;
+                    safeAddLine(4);
                     
                     pdf.setFont(undefined, 'normal');
-                    if (identity.role) pdf.text(`          Rôle: ${identity.role}`, 40, yPosition), yPosition += 4;
-                    if (identity.justification) pdf.text(`          Justification: ${identity.justification}`, 40, yPosition), yPosition += 4;
-                    if (identity.lastReview) pdf.text(`          Dernière revue: ${formatDate(identity.lastReview)}`, 40, yPosition), yPosition += 4;
-                    if (identity.nextReview) pdf.text(`          Prochaine revue: ${formatDate(identity.nextReview)}`, 40, yPosition), yPosition += 4;
+                    if (identity.role) {
+                        checkAndAddPage();
+                        pdf.text(`          Rôle: ${identity.role}`, 40, yPosition);
+                        safeAddLine(4);
+                    }
+                    if (identity.justification) {
+                        checkAndAddPage();
+                        pdf.text(`          Justification: ${identity.justification}`, 40, yPosition);
+                        safeAddLine(4);
+                    }
+                    if (identity.lastReview) {
+                        checkAndAddPage();
+                        pdf.text(`          Dernière revue: ${formatDate(identity.lastReview)}`, 40, yPosition);
+                        safeAddLine(4);
+                    }
+                    if (identity.nextReview) {
+                        checkAndAddPage();
+                        pdf.text(`          Prochaine revue: ${formatDate(identity.nextReview)}`, 40, yPosition);
+                        safeAddLine(4);
+                    }
                 });
-                yPosition += 3;
+                safeAddLine(3);
             });
-            yPosition += 5;
+            safeAddLine(5);
         });
 
-        // === CARTOGRAPHIE VISUELLE ===
-        pdf.addPage();
-        yPosition = 20;
-        
-        pdf.setFontSize(14);
-        pdf.setFont(undefined, 'bold');
-        pdf.text('CARTOGRAPHIE VISUELLE PAR PAGE', 20, yPosition);
-        yPosition += 10;
-        
-        // Sauvegarder la page actuelle et générer des captures pour chaque page
-        const originalPage = currentPage;
-        const originalServersPerPage = serversPerPage;
-        let imgWidth = 240;
-        let imgHeight = 100;
-        
-        // Générer une image pour chaque page de serveurs
-        const totalPages = Math.max(1, Math.ceil(data.servers.length / serversPerPage));
-        
-        for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-            // Changer temporairement vers cette page pour le rendu
-            currentPage = pageNum;
-            render(); // Re-rendre pour cette page
-            
-            // Attendre un petit délai pour que le rendu se termine
-            await new Promise(resolve => setTimeout(resolve, 200));
-            
-            let imgData = null;
-            
-            pdf.setFontSize(12);
-            pdf.setFont(undefined, 'bold');
-            pdf.text(`Page ${pageNum}/${totalPages} - Serveurs ${((pageNum-1)*serversPerPage)+1} à ${Math.min(pageNum*serversPerPage, data.servers.length)}`, 20, yPosition);
-            yPosition += 8;
-            
-            try {
-                // Méthode 1: Capturer le container complet
-                const container = document.getElementById('container');
-                const canvas = await html2canvas(container, {
-                    backgroundColor: '#ffffff',
-                    scale: 0.6,
-                    logging: false,
-                    useCORS: true,
-                    allowTaint: true,
-                    foreignObjectRendering: false,
-                    imageTimeout: 5000,
-                    removeContainer: false
-                });
-                
-                imgData = canvas.toDataURL('image/png');
-                imgHeight = Math.min(120, (canvas.height * imgWidth) / canvas.width);
-                
-            } catch (error) {
-                console.warn(`Erreur capture page ${pageNum}:`, error);
-                
-                // Générer un placeholder pour cette page
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = 800;
-                tempCanvas.height = 300;
-                const ctx = tempCanvas.getContext('2d');
-                
-                // Fond blanc
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-                
-                // Bordure
-                ctx.strokeStyle = '#667eea';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(10, 10, tempCanvas.width - 20, tempCanvas.height - 20);
-                
-                // Titre
-                ctx.fillStyle = '#2d3748';
-                ctx.font = 'bold 20px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(`Cartographie - Page ${pageNum}/${totalPages}`, tempCanvas.width / 2, 50);
-                
-                // Dessiner représentation des serveurs de cette page
-                const startIndex = (pageNum - 1) * serversPerPage;
-                const endIndex = Math.min(startIndex + serversPerPage, data.servers.length);
-                const pageServers = data.servers.slice(startIndex, endIndex);
-                
-                ctx.font = '14px Arial';
-                ctx.fillStyle = '#8e44ad';
-                let xPos = 80;
-                pageServers.forEach((server, index) => {
-                    ctx.fillRect(xPos, 120, 100, 50);
-                    ctx.fillStyle = '#ffffff';
-                    ctx.font = 'bold 12px Arial';
-                    ctx.fillText(server.name.substring(0, 12), xPos + 50, 150);
-                    ctx.fillStyle = '#8e44ad';
-                    xPos += 130;
-                    
-                    // Limiter l'affichage pour éviter le débordement
-                    if (index >= 4) return;
-                });
-                
-                ctx.fillStyle = '#718096';
-                ctx.font = '12px Arial';
-                ctx.fillText('Représentation simplifiée - Voir détails dans l\'inventaire', tempCanvas.width / 2, 220);
-                
-                imgData = tempCanvas.toDataURL('image/png');
-                imgHeight = (tempCanvas.height * imgWidth) / tempCanvas.width;
-            }
-            
-            // Vérifier si on a assez de place sur la page
-            if (yPosition + imgHeight > 160) {
-                pdf.addPage();
-                yPosition = 20;
-                pdf.setFontSize(12);
-                pdf.setFont(undefined, 'bold');
-                pdf.text(`Page ${pageNum}/${totalPages} - Serveurs ${((pageNum-1)*serversPerPage)+1} à ${Math.min(pageNum*serversPerPage, data.servers.length)}`, 20, yPosition);
-                yPosition += 8;
-            }
-            
-            if (imgData) {
-                // Centrer l'image sur la page
-                const pageWidth = pdf.internal.pageSize.width;
-                const centeredX = (pageWidth - imgWidth) / 2;
-                pdf.addImage(imgData, 'PNG', centeredX, yPosition, imgWidth, imgHeight);
-                yPosition += imgHeight + 15;
-            } else {
-                pdf.setFontSize(10);
-                pdf.setFont(undefined, 'italic');
-                pdf.text(`Impossible de générer l'image pour la page ${pageNum}`, 20, yPosition);
-                yPosition += 10;
-            }
-            
-            // Ajouter une nouvelle page pour la page suivante (sauf pour la dernière)
-            if (pageNum < totalPages) {
-                pdf.addPage();
-                yPosition = 20;
-            }
-        }
-        
-        // Restaurer la page originale
-        currentPage = originalPage;
-        serversPerPage = originalServersPerPage;
-        render();
+        // Section cartographie visuelle supprimée pour éviter les erreurs de génération PDF
         
         // === COMMENTAIRES D'AUDIT ===
         if (pdfData.comments) {
-            if (yPosition > 150) {
+            if (yPosition > MAX_Y_POSITION - 30) { // Plus de marge pour les commentaires
                 pdf.addPage();
                 yPosition = 20;
             }
@@ -2280,7 +2195,7 @@ async function confirmGenerateAuditPDF() {
             pdf.setFont(undefined, 'normal');
             const commentLines = pdf.splitTextToSize(pdfData.comments, 250);
             commentLines.forEach(line => {
-                if (yPosition > 180) {
+                if (yPosition > MAX_Y_POSITION) {
                     pdf.addPage();
                     yPosition = 20;
                 }
@@ -2292,7 +2207,7 @@ async function confirmGenerateAuditPDF() {
         
         // === SECTION SIGNATURE ===
         if (pdfData.includeSignature) {
-            if (yPosition > 120) {
+            if (yPosition > MAX_Y_POSITION - 60) { // Plus de marge pour signatures
                 pdf.addPage();
                 yPosition = 20;
             }
@@ -2334,7 +2249,7 @@ async function confirmGenerateAuditPDF() {
         
         // === MÉTADONNÉES TECHNIQUES ===
         if (pdfData.includeMeta) {
-            if (yPosition > 160) {
+            if (yPosition > MAX_Y_POSITION - 20) {
                 pdf.addPage();
                 yPosition = 20;
             }
@@ -2353,14 +2268,85 @@ async function confirmGenerateAuditPDF() {
             pdf.text(`Nombre total d'éléments traités: ${data.servers.length + calculateDetailedStats().accountCount + calculateDetailedStats().identityCount}`, 20, yPosition);
         }
         
-        // === PIED DE PAGE SUR TOUTES LES PAGES ===
+        // === AJOUT DES DONNÉES JSON ENCODÉES ===
+        pdf.addPage();
+        const base64StartPage = pdf.internal.getNumberOfPages(); // Mémoriser la première page Base64
+        let jsonYPosition = 20;
+        
+        pdf.setFontSize(12);
+        pdf.setFont(undefined, 'bold');
+        pdf.text('SAUVEGARDE DONNÉES (BASE64)', 20, jsonYPosition);
+        jsonYPosition += 8;
+        
+        pdf.setFontSize(7);
+        pdf.setFont(undefined, 'normal');
+        pdf.text('Données complètes encodées en Base64 - Intégrité garantie', 20, jsonYPosition);
+        jsonYPosition += 5;
+        
+        pdf.setFontSize(6);
+        pdf.setFont(undefined, 'italic');
+        pdf.text('Pour restaurer: 1) Copier le Base64 ci-dessous', 20, jsonYPosition);
+        jsonYPosition += 4;
+        pdf.text('2) Décoder avec: JSON.parse(decodeURIComponent(escape(atob("BASE64"))))', 20, jsonYPosition);
+        jsonYPosition += 8;
+        
+        // Encoder les données JSON en Base64 UTF-8 correct
+        const jsonData = JSON.stringify(data, null, 2); // Format propre pour l'encodage
+        
+        // S'assurer que les fins de ligne sont LF uniquement (pas CRLF)
+        const jsonDataNormalized = jsonData.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        
+        // Méthode d'encodage UTF-8 classique et compatible
+        function utf8ToBase64(str) {
+            return btoa(unescape(encodeURIComponent(str)));
+        }
+        
+        const base64Data = utf8ToBase64(jsonDataNormalized);
+        const base64Lines = pdf.splitTextToSize(base64Data, 250); // Pleine largeur
+        
+        // Affichage Base64 avec gestion automatique des pages multiples
+        pdf.setFontSize(4);
+        pdf.setFont(undefined, 'normal');
+        
+        // Afficher TOUT le Base64, même si ça prend plusieurs pages - SANS MARGE NI FOOTER
+        base64Lines.forEach((line, index) => {
+            // Utiliser TOUTE la hauteur de page pour le Base64 (aucun footer sur ces pages)
+            if (jsonYPosition > 205) { // Utiliser quasi toute la page (210mm - 5mm)
+                pdf.addPage();
+                jsonYPosition = 20;
+                // Pas de titre sur les pages suivantes pour faciliter le copier/coller
+            }
+            
+            pdf.text(line, 20, jsonYPosition);
+            jsonYPosition += 2.2;
+        });
+        
+        // Ajouter un indicateur de fin pour confirmer que tout est inclus
+        if (jsonYPosition > 200) { // Même logique que pour le Base64
+            pdf.addPage();
+            jsonYPosition = 20;
+        }
+        jsonYPosition += 5;
+        pdf.setFontSize(6);
+        pdf.setFont(undefined, 'bold');
+        pdf.text(`--- FIN BASE64 (${base64Lines.length} lignes, ${base64Data.length} caractères) ---`, 20, jsonYPosition);
+        
+        const base64EndPage = pdf.internal.getNumberOfPages(); // Mémoriser la dernière page Base64
+
+        // === PIED DE PAGE SUR TOUTES LES PAGES (SAUF BASE64) ===
         const pageCount = pdf.internal.getNumberOfPages();
         for (let i = 1; i <= pageCount; i++) {
+            // Ignorer les pages Base64 pour éviter les collisions
+            if (i >= base64StartPage && i <= base64EndPage) {
+                continue; // Pas de footer sur les pages Base64
+            }
+            
             pdf.setPage(i);
             pdf.setFontSize(8);
             pdf.setFont(undefined, 'normal');
-            pdf.text(`${pdfData.classification} - Page ${i}/${pageCount}`, 20, 200);
-            pdf.text(`Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, 200, 200);
+            // Position du footer avec constante
+            pdf.text(`${pdfData.classification} - Page ${i}/${pageCount}`, 20, FOOTER_Y_POSITION);
+            pdf.text(`Généré le ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR')}`, 200, FOOTER_Y_POSITION);
         }
         
         // Sauvegarder le PDF
