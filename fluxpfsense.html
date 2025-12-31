@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>pfSense Firewall Rules Visualizer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
     <style>
         :root {
             --pass-color: #22c55e;
@@ -186,6 +188,362 @@
         }
         
         .btn-reset:hover { background: rgba(239, 68, 68, 0.2); }
+        
+        .btn-export {
+            padding: 9px 16px;
+            border-radius: 8px;
+            border: 1px solid #22c55e;
+            background: rgba(34, 197, 94, 0.1);
+            color: #22c55e;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.82rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .btn-export:hover { background: rgba(34, 197, 94, 0.25); }
+        
+        .btn-export:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        /* PDF Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+        
+        .modal-overlay.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+        
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 25px;
+            max-width: 500px;
+            width: 90%;
+            border: 1px solid var(--border-color);
+            transform: scale(0.9);
+            transition: transform 0.3s;
+        }
+        
+        .modal-overlay.visible .modal {
+            transform: scale(1);
+        }
+        
+        .modal-title {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .modal-section {
+            margin-bottom: 18px;
+        }
+        
+        .modal-section-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .checkbox-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: rgba(51, 65, 85, 0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        .checkbox-item:hover {
+            background: rgba(51, 65, 85, 0.5);
+        }
+        
+        .checkbox-item input {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .checkbox-item label {
+            cursor: pointer;
+            flex: 1;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .btn-modal {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+        
+        .btn-modal-cancel {
+            background: rgba(51, 65, 85, 0.5);
+            color: var(--text-primary);
+        }
+        
+        .btn-modal-cancel:hover {
+            background: rgba(51, 65, 85, 0.8);
+        }
+        
+        .btn-modal-generate {
+            background: #22c55e;
+            color: white;
+        }
+        
+        .btn-modal-generate:hover {
+            background: #16a34a;
+        }
+        
+        .generating-indicator {
+            display: none;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-secondary);
+        }
+        
+        .generating-indicator.visible {
+            display: flex;
+        }
+        
+        .generating-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border-color);
+            border-top-color: #22c55e;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        /* Rule Review System */
+        .rule-review {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px dashed var(--border-color);
+            flex-wrap: wrap;
+        }
+        
+        .review-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+        
+        .review-checkbox input {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            accent-color: #22c55e;
+        }
+        
+        .review-checkbox label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            cursor: pointer;
+        }
+        
+        .review-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+        
+        .review-status.justified {
+            background: rgba(34, 197, 94, 0.15);
+            color: #22c55e;
+        }
+        
+        .review-status.not-justified {
+            background: rgba(239, 68, 68, 0.15);
+            color: #ef4444;
+        }
+        
+        .review-status.pending {
+            background: rgba(245, 158, 11, 0.15);
+            color: #f59e0b;
+        }
+        
+        .review-input {
+            flex: 1;
+            min-width: 150px;
+            padding: 5px 10px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: rgba(30, 41, 59, 0.8);
+            color: var(--text-primary);
+            font-size: 0.75rem;
+        }
+        
+        .review-input:focus {
+            outline: none;
+            border-color: #60a5fa;
+        }
+        
+        .review-input::placeholder {
+            color: #64748b;
+        }
+        
+        .review-actions {
+            display: flex;
+            gap: 4px;
+        }
+        
+        .review-action-btn {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: none;
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .review-action-btn.justify {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        
+        .review-action-btn.justify:hover {
+            background: rgba(34, 197, 94, 0.4);
+        }
+        
+        .review-action-btn.not-justify {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .review-action-btn.not-justify:hover {
+            background: rgba(239, 68, 68, 0.4);
+        }
+        
+        .action-select {
+            padding: 5px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: rgba(30, 41, 59, 0.8);
+            color: var(--text-primary);
+            font-size: 0.72rem;
+            cursor: pointer;
+        }
+        
+        .action-select:focus {
+            outline: none;
+            border-color: #60a5fa;
+        }
+        
+        .rule-card.reviewed-justified {
+            border-left-color: #22c55e !important;
+            background: rgba(34, 197, 94, 0.05);
+        }
+        
+        .rule-card.reviewed-not-justified {
+            border-left-color: #ef4444 !important;
+            background: rgba(239, 68, 68, 0.05);
+        }
+        
+        /* Review Summary Stats */
+        .review-summary {
+            display: flex;
+            gap: 15px;
+            padding: 12px 15px;
+            background: rgba(30, 41, 59, 0.6);
+            border-radius: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .review-summary-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.82rem;
+        }
+        
+        .review-summary-count {
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+        
+        .review-summary-count.justified {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        
+        .review-summary-count.not-justified {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+        }
+        
+        .review-summary-count.pending {
+            background: rgba(245, 158, 11, 0.2);
+            color: #f59e0b;
+        }
+        
+        .btn-clear-reviews {
+            margin-left: auto;
+            padding: 5px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-clear-reviews:hover {
+            background: rgba(51, 65, 85, 0.5);
+            color: var(--text-primary);
+        }
         
         /* Tabs */
         .tabs {
@@ -788,6 +1146,7 @@
             <button class="filter-btn" data-filter="nat">🔀 NAT</button>
             <button class="filter-btn" data-filter="logged">📝 Log</button>
             <button class="btn-reset" id="btnReset">↺ Reset</button>
+            <button class="btn-export" id="btnExportPDF" title="Export to PDF">📄 Export PDF</button>
         </div>
         
         <div class="controls" id="aliasControls" style="display: none;">
@@ -846,6 +1205,62 @@
         <div class="tooltip-title"></div>
         <div class="tooltip-content"></div>
     </div>
+    
+    <!-- PDF Export Modal -->
+    <div class="modal-overlay" id="pdfModal">
+        <div class="modal">
+            <div class="modal-title">📄 Export PDF Report</div>
+            
+            <div class="modal-section">
+                <div class="modal-section-title">Include in Report</div>
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pdfIncludeSummary" checked>
+                        <label for="pdfIncludeSummary">Executive Summary & Statistics</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pdfIncludeRules" checked>
+                        <label for="pdfIncludeRules">Firewall Rules (by Interface)</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pdfIncludeAliases" checked>
+                        <label for="pdfIncludeAliases">Alias Definitions</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pdfIncludeReview" checked>
+                        <label for="pdfIncludeReview">Rule Review Status & Actions</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-section">
+                <div class="modal-section-title">Options</div>
+                <div class="checkbox-group">
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pdfIncludeDisabled">
+                        <label for="pdfIncludeDisabled">Include Disabled Rules</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pdfColorCoded" checked>
+                        <label for="pdfColorCoded">Color-coded Rule Types</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pdfOnlyReviewed">
+                        <label for="pdfOnlyReviewed">Only Include Reviewed Rules</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <div class="generating-indicator" id="generatingIndicator">
+                    <div class="generating-spinner"></div>
+                    <span>Generating PDF...</span>
+                </div>
+                <button class="btn-modal btn-modal-cancel" id="btnCancelPDF">Cancel</button>
+                <button class="btn-modal btn-modal-generate" id="btnGeneratePDF">Generate PDF</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Global state
@@ -860,6 +1275,24 @@
         let currentTab = 'rules';
         let rulesLoaded = false;
         let aliasesLoaded = false;
+        
+        // Rule review state: { tracker: { status: 'justified'|'not-justified'|'pending', justification: '', action: '' } }
+        let ruleReviews = {};
+        
+        // Available actions for unjustified rules
+        const reviewActions = [
+            { value: '', label: 'Select action...' },
+            { value: 'remove', label: 'Remove rule' },
+            { value: 'modify', label: 'Modify rule' },
+            { value: 'restrict-source', label: 'Restrict source' },
+            { value: 'restrict-dest', label: 'Restrict destination' },
+            { value: 'add-logging', label: 'Enable logging' },
+            { value: 'disable', label: 'Disable rule' },
+            { value: 'review-later', label: 'Review later' },
+            { value: 'escalate', label: 'Escalate to manager' },
+            { value: 'document', label: 'Needs documentation' },
+            { value: 'other', label: 'Other (see notes)' }
+        ];
 
         // Interface metadata
         const interfaceMeta = {
@@ -1109,6 +1542,83 @@
             currentSearch = alias;
             renderRules();
         }
+        
+        // Review functions
+        function setReviewStatus(tracker, status) {
+            if (!ruleReviews[tracker]) {
+                ruleReviews[tracker] = { status: 'pending', justification: '', action: '' };
+            }
+            ruleReviews[tracker].status = status;
+            if (status === 'justified') {
+                ruleReviews[tracker].action = '';
+            }
+            renderRules();
+            saveReviewsToStorage();
+        }
+        
+        function updateJustification(tracker, value) {
+            if (!ruleReviews[tracker]) {
+                ruleReviews[tracker] = { status: 'pending', justification: '', action: '' };
+            }
+            ruleReviews[tracker].justification = value;
+            saveReviewsToStorage();
+        }
+        
+        function updateAction(tracker, value) {
+            if (!ruleReviews[tracker]) {
+                ruleReviews[tracker] = { status: 'pending', justification: '', action: '' };
+            }
+            ruleReviews[tracker].action = value;
+            saveReviewsToStorage();
+        }
+        
+        function clearAllReviews() {
+            if (confirm('Are you sure you want to clear all review data? This cannot be undone.')) {
+                ruleReviews = {};
+                localStorage.removeItem('pfsenseRuleReviews');
+                renderRules();
+            }
+        }
+        
+        function saveReviewsToStorage() {
+            try {
+                localStorage.setItem('pfsenseRuleReviews', JSON.stringify(ruleReviews));
+            } catch (e) {
+                console.warn('Could not save reviews to localStorage:', e);
+            }
+        }
+        
+        function loadReviewsFromStorage() {
+            try {
+                const saved = localStorage.getItem('pfsenseRuleReviews');
+                if (saved) {
+                    ruleReviews = JSON.parse(saved);
+                }
+            } catch (e) {
+                console.warn('Could not load reviews from localStorage:', e);
+            }
+        }
+        
+        function getReviewStats() {
+            const total = firewallRules.length;
+            let justified = 0;
+            let notJustified = 0;
+            
+            firewallRules.forEach(rule => {
+                const review = ruleReviews[rule.tracker];
+                if (review) {
+                    if (review.status === 'justified') justified++;
+                    else if (review.status === 'not-justified') notJustified++;
+                }
+            });
+            
+            return {
+                total,
+                justified,
+                notJustified,
+                pending: total - justified - notJustified
+            };
+        }
 
         function formatDate(timestamp) {
             if (!timestamp || !timestamp.time) return '';
@@ -1240,7 +1750,28 @@
                 return a.localeCompare(b);
             });
             
-            let html = '';
+            // Review summary
+            const reviewStats = getReviewStats();
+            let html = `
+                <div class="review-summary">
+                    <div class="review-summary-item">
+                        <span>Review Progress:</span>
+                    </div>
+                    <div class="review-summary-item">
+                        <span class="review-summary-count justified">${reviewStats.justified}</span>
+                        <span>Justified</span>
+                    </div>
+                    <div class="review-summary-item">
+                        <span class="review-summary-count not-justified">${reviewStats.notJustified}</span>
+                        <span>Not Justified</span>
+                    </div>
+                    <div class="review-summary-item">
+                        <span class="review-summary-count pending">${reviewStats.pending}</span>
+                        <span>Pending</span>
+                    </div>
+                    <button class="btn-clear-reviews" onclick="clearAllReviews()">Clear All Reviews</button>
+                </div>
+            `;
             
             interfaceOrder.forEach(iface => {
                 const rules = rulesByInterface[iface];
@@ -1326,6 +1857,10 @@
                     html += `<div class="separator-row ${sep.color || ''}">${escapeHtml(sep.text)}</div>`;
                 }
                 
+                const review = ruleReviews[rule.tracker] || { status: 'pending', justification: '', action: '' };
+                const reviewClass = review.status === 'justified' ? 'reviewed-justified' : 
+                                   review.status === 'not-justified' ? 'reviewed-not-justified' : '';
+                
                 const ruleClass = rule.disabled ? 'disabled' : (rule.nat ? 'nat' : rule.type);
                 
                 let badges = '';
@@ -1340,8 +1875,13 @@
                 
                 const description = rule.description || 'No description';
                 
+                // Build action select options
+                const actionOptions = reviewActions.map(opt => 
+                    `<option value="${opt.value}" ${review.action === opt.value ? 'selected' : ''}>${opt.label}</option>`
+                ).join('');
+                
                 html += `
-                    <div class="rule-card ${ruleClass}">
+                    <div class="rule-card ${ruleClass} ${reviewClass}" data-tracker="${rule.tracker}">
                         <div class="rule-header">
                             <div class="rule-description">${highlightSearch(description, currentSearch)}</div>
                             <div class="rule-badges">${badges}</div>
@@ -1362,6 +1902,33 @@
                             <span>📍 ${rule.tracker}</span>
                             ${rule.ipprotocol ? `<span>🌐 ${rule.ipprotocol}</span>` : ''}
                             ${rule.created ? `<span>📅 ${formatDate(rule.created)}</span>` : ''}
+                        </div>
+                        <div class="rule-review">
+                            <span class="review-status ${review.status}">
+                                ${review.status === 'justified' ? '✓ Justified' : 
+                                  review.status === 'not-justified' ? '✗ Not Justified' : '? Pending Review'}
+                            </span>
+                            <input type="text" 
+                                   class="review-input" 
+                                   placeholder="${review.status === 'not-justified' ? 'Reason for rejection...' : 'Justification / Business reason...'}"
+                                   value="${escapeHtml(review.justification)}"
+                                   data-tracker="${rule.tracker}"
+                                   onchange="updateJustification('${rule.tracker}', this.value)">
+                            ${review.status === 'not-justified' ? `
+                                <select class="action-select" 
+                                        data-tracker="${rule.tracker}"
+                                        onchange="updateAction('${rule.tracker}', this.value)">
+                                    ${actionOptions}
+                                </select>
+                            ` : ''}
+                            <div class="review-actions">
+                                <button class="review-action-btn justify" 
+                                        onclick="setReviewStatus('${rule.tracker}', 'justified')"
+                                        title="Mark as Justified">✓</button>
+                                <button class="review-action-btn not-justify" 
+                                        onclick="setReviewStatus('${rule.tracker}', 'not-justified')"
+                                        title="Mark as Not Justified">✗</button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -1595,6 +2162,14 @@
             document.getElementById('btnReset').addEventListener('click', () => {
                 location.reload();
             });
+            
+            // PDF Export
+            document.getElementById('btnExportPDF').addEventListener('click', showPDFModal);
+            document.getElementById('btnCancelPDF').addEventListener('click', hidePDFModal);
+            document.getElementById('btnGeneratePDF').addEventListener('click', generatePDF);
+            document.getElementById('pdfModal').addEventListener('click', (e) => {
+                if (e.target.id === 'pdfModal') hidePDFModal();
+            });
         }
 
         function processFile(file, type) {
@@ -1620,6 +2195,7 @@
                     
                     if (rulesLoaded) {
                         document.getElementById('content').classList.add('visible');
+                        loadReviewsFromStorage();
                         renderStats();
                         renderAliasList();
                         renderRules();
@@ -1637,6 +2213,416 @@
 
         // Initialize
         document.addEventListener('DOMContentLoaded', setupEventListeners);
+        
+        // PDF Generation
+        function showPDFModal() {
+            document.getElementById('pdfModal').classList.add('visible');
+        }
+        
+        function hidePDFModal() {
+            document.getElementById('pdfModal').classList.remove('visible');
+        }
+        
+        async function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('l', 'mm', 'a4'); // Landscape orientation
+            
+            const includeSummary = document.getElementById('pdfIncludeSummary').checked;
+            const includeRules = document.getElementById('pdfIncludeRules').checked;
+            const includeAliases = document.getElementById('pdfIncludeAliases').checked;
+            const includeReview = document.getElementById('pdfIncludeReview').checked;
+            const includeDisabled = document.getElementById('pdfIncludeDisabled').checked;
+            const colorCoded = document.getElementById('pdfColorCoded').checked;
+            const onlyReviewed = document.getElementById('pdfOnlyReviewed').checked;
+            
+            // Show generating indicator
+            document.getElementById('generatingIndicator').classList.add('visible');
+            document.getElementById('btnGeneratePDF').disabled = true;
+            
+            // Wait a tick for UI update
+            await new Promise(r => setTimeout(r, 50));
+            
+            const pageWidth = doc.internal.pageSize.getWidth(); // 297mm for A4 landscape
+            const pageHeight = doc.internal.pageSize.getHeight(); // 210mm for A4 landscape
+            const margin = 10;
+            const usableWidth = pageWidth - 2 * margin; // ~277mm
+            let yPos = margin;
+            
+            // Colors
+            const colors = {
+                primary: [59, 130, 246],
+                pass: [34, 197, 94],
+                block: [239, 68, 68],
+                disabled: [107, 114, 128],
+                nat: [59, 130, 246],
+                header: [30, 41, 59],
+                text: [51, 65, 85],
+                lightText: [100, 116, 139],
+                justified: [34, 197, 94],
+                notJustified: [239, 68, 68],
+                pending: [245, 158, 11]
+            };
+            
+            // Helper functions
+            function addPageHeader() {
+                doc.setFillColor(...colors.header);
+                doc.rect(0, 0, pageWidth, 10, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(8);
+                doc.text('pfSense Firewall Audit Report', margin, 7);
+                doc.text(new Date().toLocaleDateString(), pageWidth - margin, 7, { align: 'right' });
+            }
+            
+            function addPageFooter(pageNum) {
+                doc.setTextColor(...colors.lightText);
+                doc.setFontSize(8);
+                doc.text(`Page ${pageNum}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+            }
+            
+            function checkPageBreak(needed = 25) {
+                if (yPos + needed > pageHeight - 15) {
+                    addPageFooter(doc.getNumberOfPages());
+                    doc.addPage();
+                    addPageHeader();
+                    yPos = 16;
+                    return true;
+                }
+                return false;
+            }
+            
+            function addSectionTitle(title) {
+                checkPageBreak(15);
+                doc.setFillColor(...colors.primary);
+                doc.rect(margin, yPos, usableWidth, 7, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFontSize(10);
+                doc.setFont(undefined, 'bold');
+                doc.text(title, margin + 3, yPos + 5);
+                doc.setFont(undefined, 'normal');
+                yPos += 10;
+            }
+            
+            // Title Page
+            doc.setFillColor(...colors.header);
+            doc.rect(0, 0, pageWidth, 40, 'F');
+            
+            doc.setTextColor(255, 255, 255);
+            doc.setFontSize(20);
+            doc.setFont(undefined, 'bold');
+            doc.text('pfSense Firewall Audit Report', pageWidth / 2, 20, { align: 'center' });
+            doc.setFont(undefined, 'normal');
+            
+            doc.setFontSize(10);
+            doc.text(`Generated: ${new Date().toLocaleString()}`, pageWidth / 2, 32, { align: 'center' });
+            
+            yPos = 50;
+            
+            // Summary Section
+            if (includeSummary) {
+                addSectionTitle('Executive Summary');
+                
+                const reviewStats = getReviewStats();
+                const stats = {
+                    total: firewallRules.length,
+                    pass: firewallRules.filter(r => r.type === 'pass' && !r.disabled).length,
+                    block: firewallRules.filter(r => r.type === 'block' || r.type === 'reject').length,
+                    disabled: firewallRules.filter(r => r.disabled).length,
+                    justified: reviewStats.justified,
+                    notJustified: reviewStats.notJustified,
+                    pending: reviewStats.pending,
+                    aliases: Object.keys(aliasDefinitions).length || detectedAliases.size
+                };
+                
+                // Stats boxes - 8 boxes in one row for landscape
+                const boxWidth = (usableWidth - 35) / 8;
+                const statsData = [
+                    { label: 'Total', value: stats.total, color: colors.primary },
+                    { label: 'Pass', value: stats.pass, color: colors.pass },
+                    { label: 'Block', value: stats.block, color: colors.block },
+                    { label: 'Disabled', value: stats.disabled, color: colors.disabled },
+                    { label: 'Justified', value: stats.justified, color: colors.justified },
+                    { label: 'Not Just.', value: stats.notJustified, color: colors.notJustified },
+                    { label: 'Pending', value: stats.pending, color: colors.pending },
+                    { label: 'Aliases', value: stats.aliases, color: [56, 189, 248] }
+                ];
+                
+                statsData.forEach((stat, idx) => {
+                    const x = margin + idx * (boxWidth + 5);
+                    const y = yPos;
+                    
+                    doc.setFillColor(245, 247, 250);
+                    doc.roundedRect(x, y, boxWidth, 14, 2, 2, 'F');
+                    
+                    doc.setTextColor(...stat.color);
+                    doc.setFontSize(12);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(String(stat.value), x + boxWidth / 2, y + 6, { align: 'center' });
+                    
+                    doc.setTextColor(...colors.lightText);
+                    doc.setFontSize(6);
+                    doc.setFont(undefined, 'normal');
+                    doc.text(stat.label, x + boxWidth / 2, y + 11, { align: 'center' });
+                });
+                
+                yPos += 20;
+            }
+            
+            // Rules by Interface
+            if (includeRules) {
+                addSectionTitle('Firewall Rules by Interface');
+                
+                const rulesByInterface = {};
+                const interfaceOrder = [];
+                
+                firewallRules.forEach(rule => {
+                    if (!includeDisabled && rule.disabled) return;
+                    
+                    if (onlyReviewed) {
+                        const review = ruleReviews[rule.tracker];
+                        if (!review || review.status === 'pending') return;
+                    }
+                    
+                    if (!rulesByInterface[rule.interface]) {
+                        rulesByInterface[rule.interface] = [];
+                        interfaceOrder.push(rule.interface);
+                    }
+                    rulesByInterface[rule.interface].push(rule);
+                });
+                
+                const priorityOrder = ['wan', 'lan', 'openvpn', 'enc0', 'ipsec'];
+                interfaceOrder.sort((a, b) => {
+                    const aIdx = priorityOrder.indexOf(a);
+                    const bIdx = priorityOrder.indexOf(b);
+                    if (aIdx !== -1 && bIdx !== -1) return aIdx - bIdx;
+                    if (aIdx !== -1) return -1;
+                    if (bIdx !== -1) return 1;
+                    return a.localeCompare(b);
+                });
+                
+                for (const iface of interfaceOrder) {
+                    const rules = rulesByInterface[iface];
+                    if (!rules || rules.length === 0) continue;
+                    
+                    checkPageBreak(20);
+                    
+                    const meta = interfaceMeta[iface] || { name: iface.toUpperCase() };
+                    doc.setFillColor(51, 65, 85);
+                    doc.roundedRect(margin, yPos, usableWidth, 6, 1, 1, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(8);
+                    doc.setFont(undefined, 'bold');
+                    doc.text(`${meta.name} (${rules.length} rules)`, margin + 3, yPos + 4.5);
+                    doc.setFont(undefined, 'normal');
+                    yPos += 8;
+                    
+                    const tableData = rules.map(rule => {
+                        const srcAddr = rule.source.address || 'any';
+                        const srcPort = rule.source.port ? `:${rule.source.port}` : '';
+                        const dstAddr = rule.destination.address || 'any';
+                        const dstPort = rule.destination.port ? `:${rule.destination.port}` : '';
+                        const review = ruleReviews[rule.tracker] || { status: 'pending' };
+                        
+                        const row = [
+                            rule.type.substring(0, 5).toUpperCase(),
+                            (rule.protocol || 'any').substring(0, 6),
+                            `${srcAddr}${srcPort}`.substring(0, 30),
+                            `${dstAddr}${dstPort}`.substring(0, 30),
+                            (rule.description || '-').substring(0, 50)
+                        ];
+                        
+                        if (includeReview) {
+                            row.push(review.status === 'justified' ? 'OK' : review.status === 'not-justified' ? 'NO' : '?');
+                        }
+                        
+                        return row;
+                    });
+                    
+                    const tableHead = [['Act', 'Proto', 'Source', 'Destination', 'Description']];
+                    if (includeReview) {
+                        tableHead[0].push('R');
+                    }
+                    
+                    doc.autoTable({
+                        startY: yPos,
+                        head: tableHead,
+                        body: tableData,
+                        margin: { left: margin, right: margin },
+                        tableWidth: usableWidth,
+                        styles: {
+                            fontSize: 6,
+                            cellPadding: 1,
+                            overflow: 'hidden'
+                        },
+                        headStyles: {
+                            fillColor: [71, 85, 105],
+                            textColor: 255,
+                            fontStyle: 'bold',
+                            fontSize: 6
+                        },
+                        bodyStyles: {
+                            textColor: [51, 65, 85]
+                        },
+                        alternateRowStyles: {
+                            fillColor: [248, 250, 252]
+                        },
+                        didParseCell: function(data) {
+                            if (colorCoded && data.section === 'body') {
+                                if (data.column.index === 0) {
+                                    const action = data.cell.raw.toLowerCase();
+                                    if (action === 'pass') {
+                                        data.cell.styles.textColor = colors.pass;
+                                        data.cell.styles.fontStyle = 'bold';
+                                    } else if (action === 'block') {
+                                        data.cell.styles.textColor = colors.block;
+                                        data.cell.styles.fontStyle = 'bold';
+                                    }
+                                }
+                                if (includeReview && data.column.index === 5) {
+                                    const status = data.cell.raw;
+                                    if (status === 'OK') {
+                                        data.cell.styles.textColor = colors.justified;
+                                        data.cell.styles.fontStyle = 'bold';
+                                    } else if (status === 'NO') {
+                                        data.cell.styles.textColor = colors.notJustified;
+                                        data.cell.styles.fontStyle = 'bold';
+                                    } else {
+                                        data.cell.styles.textColor = colors.pending;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    
+                    yPos = doc.lastAutoTable.finalY + 5;
+                }
+            }
+            
+            // Review Details for Not Justified Rules
+            if (includeReview) {
+                const notJustifiedRules = firewallRules.filter(rule => {
+                    const review = ruleReviews[rule.tracker];
+                    return review && review.status === 'not-justified';
+                });
+                
+                if (notJustifiedRules.length > 0) {
+                    checkPageBreak(25);
+                    doc.setFillColor(...colors.notJustified);
+                    doc.rect(margin, yPos, usableWidth, 7, 'F');
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(10);
+                    doc.setFont(undefined, 'bold');
+                    doc.text('Rules Requiring Action', margin + 3, yPos + 5);
+                    doc.setFont(undefined, 'normal');
+                    yPos += 10;
+                    
+                    const actionTableData = notJustifiedRules.map(rule => {
+                        const review = ruleReviews[rule.tracker];
+                        const actionLabel = reviewActions.find(a => a.value === review.action)?.label || '-';
+                        return [
+                            rule.interface.toUpperCase().substring(0, 8),
+                            (rule.description || rule.tracker).substring(0, 35),
+                            (review.justification || '-').substring(0, 45),
+                            actionLabel.substring(0, 20)
+                        ];
+                    });
+                    
+                    doc.autoTable({
+                        startY: yPos,
+                        head: [['Interface', 'Rule', 'Reason', 'Action']],
+                        body: actionTableData,
+                        margin: { left: margin, right: margin },
+                        tableWidth: usableWidth,
+                        styles: {
+                            fontSize: 6,
+                            cellPadding: 1.5,
+                            overflow: 'hidden'
+                        },
+                        headStyles: {
+                            fillColor: [239, 68, 68],
+                            textColor: 255,
+                            fontStyle: 'bold',
+                            fontSize: 6
+                        },
+                        bodyStyles: {
+                            textColor: [51, 65, 85]
+                        },
+                        alternateRowStyles: {
+                            fillColor: [254, 242, 242]
+                        }
+                    });
+                    
+                    yPos = doc.lastAutoTable.finalY + 5;
+                }
+            }
+            
+            // Aliases
+            if (includeAliases && Object.keys(aliasDefinitions).length > 0) {
+                checkPageBreak(25);
+                addSectionTitle('Alias Definitions');
+                
+                const aliasData = Object.values(aliasDefinitions)
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map(alias => [
+                        alias.name.substring(0, 22),
+                        alias.type.substring(0, 8),
+                        (alias.addresses.join(', ') || alias.url || '-').substring(0, 70),
+                        (alias.description || '-').substring(0, 30)
+                    ]);
+                
+                doc.autoTable({
+                    startY: yPos,
+                    head: [['Name', 'Type', 'Values', 'Description']],
+                    body: aliasData,
+                    margin: { left: margin, right: margin },
+                    tableWidth: usableWidth,
+                    styles: {
+                        fontSize: 6,
+                        cellPadding: 1.5,
+                        overflow: 'hidden'
+                    },
+                    headStyles: {
+                        fillColor: [71, 85, 105],
+                        textColor: 255,
+                        fontStyle: 'bold',
+                        fontSize: 6
+                    },
+                    bodyStyles: {
+                        textColor: [51, 65, 85]
+                    },
+                    alternateRowStyles: {
+                        fillColor: [248, 250, 252]
+                    },
+                    didParseCell: function(data) {
+                        if (colorCoded && data.section === 'body' && data.column.index === 1) {
+                            const type = data.cell.raw.toLowerCase();
+                            if (type === 'host') data.cell.styles.textColor = [34, 211, 238];
+                            else if (type === 'network') data.cell.styles.textColor = [167, 139, 250];
+                            else if (type === 'port') data.cell.styles.textColor = [251, 146, 60];
+                            else if (type === 'urltable') data.cell.styles.textColor = [244, 114, 182];
+                        }
+                    }
+                });
+                
+                yPos = doc.lastAutoTable.finalY + 5;
+            }
+            
+            // Add page numbers
+            const totalPages = doc.getNumberOfPages();
+            for (let i = 1; i <= totalPages; i++) {
+                doc.setPage(i);
+                if (i > 1) addPageHeader();
+                addPageFooter(i);
+            }
+            
+            // Save
+            const filename = `pfsense_audit_${new Date().toISOString().slice(0, 10)}.pdf`;
+            doc.save(filename);
+            
+            // Hide generating indicator
+            document.getElementById('generatingIndicator').classList.remove('visible');
+            document.getElementById('btnGeneratePDF').disabled = false;
+            hidePDFModal();
+        }
     </script>
 </body>
 </html>
