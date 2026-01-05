@@ -1446,11 +1446,12 @@
         }
 
         function parseEndpoint(node) {
-            if (!node) return { address: 'any', port: '', network: false };
+            if (!node) return { address: 'any', port: '', network: false, not: false };
             
             let address = 'any';
             let port = '';
             let network = false;
+            let not = node.querySelector('not') !== null;
             
             if (node.querySelector('any')) {
                 address = 'any';
@@ -1463,7 +1464,7 @@
             
             port = getNodeText(node, 'port');
             
-            return { address, port, network };
+            return { address, port, network, not };
         }
 
         function parseTimestamp(node) {
@@ -1495,17 +1496,22 @@
             let addr = endpoint.address || 'any';
             if (endpoint.network) addr = addr + ' net';
             
+            let prefix = '';
+            if (endpoint.not) {
+                prefix = '<span style="color: #f97316; font-weight: 600;">NOT </span>';
+            }
+            
             if (addr === 'any') {
-                return '<span style="color: #64748b">any</span>';
+                return prefix + '<span style="color: #64748b">any</span>';
             }
             
             const aliasInfo = getAliasInfo(addr);
             if (aliasInfo || detectedAliases.has(addr)) {
                 const displayAddr = highlight ? highlightSearch(addr, highlight) : escapeHtml(addr);
-                return `<span class="alias" data-alias="${escapeHtml(addr)}">${displayAddr}</span>`;
+                return `${prefix}<span class="alias" data-alias="${escapeHtml(addr)}">${displayAddr}</span>`;
             }
             
-            return highlight ? highlightSearch(addr, highlight) : escapeHtml(addr);
+            return prefix + (highlight ? highlightSearch(addr, highlight) : escapeHtml(addr));
         }
 
         function formatPort(port, highlight = '') {
@@ -2418,15 +2424,17 @@
                     const tableData = rules.map(rule => {
                         const srcAddr = rule.source.address || 'any';
                         const srcPort = rule.source.port ? `:${rule.source.port}` : '';
+                        const srcNot = rule.source.not ? 'NOT ' : '';
                         const dstAddr = rule.destination.address || 'any';
                         const dstPort = rule.destination.port ? `:${rule.destination.port}` : '';
+                        const dstNot = rule.destination.not ? 'NOT ' : '';
                         const review = ruleReviews[rule.tracker] || { status: 'pending' };
                         
                         const row = [
                             rule.type.substring(0, 5).toUpperCase(),
                             (rule.protocol || 'any').substring(0, 6),
-                            `${srcAddr}${srcPort}`.substring(0, 30),
-                            `${dstAddr}${dstPort}`.substring(0, 30),
+                            `${srcNot}${srcAddr}${srcPort}`.substring(0, 30),
+                            `${dstNot}${dstAddr}${dstPort}`.substring(0, 30),
                             (rule.description || '-').substring(0, 50)
                         ];
                         
