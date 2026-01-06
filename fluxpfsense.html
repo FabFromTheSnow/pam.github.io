@@ -336,6 +336,57 @@
             background: #16a34a;
         }
         
+        .commentary-input {
+            width: 100%;
+            min-height: 100px;
+            padding: 12px 14px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: rgba(30, 41, 59, 0.8);
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            font-family: inherit;
+            resize: vertical;
+            line-height: 1.5;
+        }
+        
+        .commentary-input:focus {
+            outline: none;
+            border-color: #60a5fa;
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+        }
+        
+        .commentary-input::placeholder {
+            color: #64748b;
+        }
+        
+        .commentary-section {
+            margin-top: 20px;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .commentary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .commentary-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .commentary-hint {
+            font-size: 0.75rem;
+            color: #64748b;
+            font-style: italic;
+        }
+        
         .generating-indicator {
             display: none;
             align-items: center;
@@ -1197,6 +1248,15 @@
             <div class="rules-panel">
                 <div class="tab-content active" id="tabRules"></div>
                 <div class="tab-content" id="tabAliases"></div>
+                
+                <!-- Commentary Section -->
+                <div class="commentary-section" id="commentarySection">
+                    <div class="commentary-header">
+                        <span class="commentary-title">📝 Audit Commentary / Notes</span>
+                        <span class="commentary-hint">This will be included in the PDF report</span>
+                    </div>
+                    <textarea id="auditCommentary" class="commentary-input" placeholder="Enter audit observations, recommendations, findings, or any additional notes to include in the report..."></textarea>
+                </div>
             </div>
         </div>
     </div>
@@ -1247,6 +1307,10 @@
                     <div class="checkbox-item">
                         <input type="checkbox" id="pdfOnlyReviewed">
                         <label for="pdfOnlyReviewed">Only Include Reviewed Rules</label>
+                    </div>
+                    <div class="checkbox-item">
+                        <input type="checkbox" id="pdfIncludeCommentary" checked>
+                        <label for="pdfIncludeCommentary">Include Commentary / Notes</label>
                     </div>
                 </div>
             </div>
@@ -1579,9 +1643,14 @@
         }
         
         function clearAllReviews() {
-            if (confirm('Are you sure you want to clear all review data? This cannot be undone.')) {
+            if (confirm('Are you sure you want to clear all review data and commentary? This cannot be undone.')) {
                 ruleReviews = {};
                 localStorage.removeItem('pfsenseRuleReviews');
+                localStorage.removeItem('pfsenseAuditCommentary');
+                const commentary = document.getElementById('auditCommentary');
+                if (commentary) {
+                    commentary.value = '';
+                }
                 renderRules();
             }
         }
@@ -1589,6 +1658,11 @@
         function saveReviewsToStorage() {
             try {
                 localStorage.setItem('pfsenseRuleReviews', JSON.stringify(ruleReviews));
+                // Also save commentary
+                const commentary = document.getElementById('auditCommentary');
+                if (commentary) {
+                    localStorage.setItem('pfsenseAuditCommentary', commentary.value);
+                }
             } catch (e) {
                 console.warn('Could not save reviews to localStorage:', e);
             }
@@ -1599,6 +1673,14 @@
                 const saved = localStorage.getItem('pfsenseRuleReviews');
                 if (saved) {
                     ruleReviews = JSON.parse(saved);
+                }
+                // Also load commentary
+                const savedCommentary = localStorage.getItem('pfsenseAuditCommentary');
+                if (savedCommentary) {
+                    const commentary = document.getElementById('auditCommentary');
+                    if (commentary) {
+                        commentary.value = savedCommentary;
+                    }
                 }
             } catch (e) {
                 console.warn('Could not load reviews from localStorage:', e);
@@ -2176,6 +2258,11 @@
             document.getElementById('pdfModal').addEventListener('click', (e) => {
                 if (e.target.id === 'pdfModal') hidePDFModal();
             });
+            
+            // Commentary auto-save
+            document.getElementById('auditCommentary').addEventListener('input', () => {
+                saveReviewsToStorage();
+            });
         }
 
         function processFile(file, type) {
@@ -2428,14 +2515,14 @@
                         const dstAddr = rule.destination.address || 'any';
                         const dstPort = rule.destination.port ? `:${rule.destination.port}` : '';
                         const dstNot = rule.destination.not ? 'NOT ' : '';
-                        const review = ruleReviews[rule.tracker] || { status: 'pending' };
+                        const review = ruleReviews[rule.tracker] || { status: 'pending', justification: '' };
                         
                         const row = [
                             rule.type.substring(0, 5).toUpperCase(),
                             (rule.protocol || 'any').substring(0, 6),
-                            `${srcNot}${srcAddr}${srcPort}`.substring(0, 30),
-                            `${dstNot}${dstAddr}${dstPort}`.substring(0, 30),
-                            (rule.description || '-').substring(0, 50)
+                            `${srcNot}${srcAddr}${srcPort}`.substring(0, 28),
+                            `${dstNot}${dstAddr}${dstPort}`.substring(0, 20),
+                            (review.justification || '-').substring(0, 70)
                         ];
                         
                         if (includeReview) {
@@ -2445,10 +2532,15 @@
                         return row;
                     });
                     
-                    const tableHead = [['Act', 'Proto', 'Source', 'Destination', 'Description']];
+                    const tableHead = [['Act', 'Proto', 'Source', 'Dest', 'Justification']];
                     if (includeReview) {
                         tableHead[0].push('R');
                     }
+                    
+                    // Calculate column widths: Act(10) + Proto(12) + Source(50) + Dest(35) + Justification(remaining) + R(10)
+                    const reviewColWidth = includeReview ? 10 : 0;
+                    const fixedColsWidth = 10 + 12 + 50 + 35 + reviewColWidth;
+                    const justificationWidth = usableWidth - fixedColsWidth;
                     
                     doc.autoTable({
                         startY: yPos,
@@ -2456,6 +2548,14 @@
                         body: tableData,
                         margin: { left: margin, right: margin },
                         tableWidth: usableWidth,
+                        columnStyles: {
+                            0: { cellWidth: 10 },
+                            1: { cellWidth: 12 },
+                            2: { cellWidth: 50 },
+                            3: { cellWidth: 35 },
+                            4: { cellWidth: justificationWidth },
+                            5: { cellWidth: reviewColWidth || 'auto' }
+                        },
                         styles: {
                             fontSize: 6,
                             cellPadding: 1,
@@ -2612,6 +2712,33 @@
                 });
                 
                 yPos = doc.lastAutoTable.finalY + 5;
+            }
+            
+            // Commentary section
+            const includeCommentary = document.getElementById('pdfIncludeCommentary').checked;
+            const commentary = document.getElementById('auditCommentary').value.trim();
+            if (includeCommentary && commentary) {
+                checkPageBreak(40);
+                addSectionTitle('Commentary / Notes');
+                
+                doc.setFillColor(248, 250, 252);
+                doc.roundedRect(margin, yPos, usableWidth, 4, 1, 1, 'F');
+                yPos += 2;
+                
+                doc.setTextColor(51, 65, 85);
+                doc.setFontSize(8);
+                doc.setFont(undefined, 'normal');
+                
+                // Split commentary into lines that fit the page width
+                const lines = doc.splitTextToSize(commentary, usableWidth - 10);
+                
+                lines.forEach(line => {
+                    checkPageBreak(6);
+                    doc.text(line, margin + 5, yPos + 4);
+                    yPos += 5;
+                });
+                
+                yPos += 5;
             }
             
             // Add page numbers
