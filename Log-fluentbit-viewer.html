@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LOGFORGE · Log Analyzer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;800&display=swap');
+:root {
+  --bg:#0a0c0f; --bg2:#0f1216; --bg3:#151920; --bg4:#1c2128; --border:#252d3a;
+  --amber:#e8a225; --amber2:#f5c842; --green:#22c55e; --red:#ef4444;
+  --orange:#f97316; --blue:#60a5fa; --cyan:#22d3ee; --violet:#a78bfa;
+  --muted:#4a5568; --text:#c9d1d9; --text2:#8b949e; --text3:#58626d;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:13px;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px);pointer-events:none;z-index:9999}
+
+/* ── HEADER ── */
+.header{display:flex;align-items:center;gap:14px;padding:12px 20px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:200}
+.logo{display:flex;align-items:center;gap:10px}
+.logo-hex{width:30px;height:30px;background:var(--amber);clip-path:polygon(50% 0%,100% 25%,100% 75%,50% 100%,0% 75%,0% 25%);display:grid;place-items:center;font-size:13px;flex-shrink:0}
+.logo-name{font-family:'Syne',sans-serif;font-weight:800;font-size:15px;color:var(--amber);letter-spacing:.05em}
+.logo-sub{font-size:9px;color:var(--text3);letter-spacing:.1em;text-transform:uppercase}
+.hright{margin-left:auto;display:flex;align-items:center;gap:7px}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:4px;border:1px solid var(--border);background:var(--bg3);color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;cursor:pointer;transition:all .15s;letter-spacing:.03em;white-space:nowrap}
+.btn:hover{border-color:var(--amber);color:var(--amber);background:rgba(232,162,37,.08)}
+.btn.active{border-color:var(--amber);color:var(--amber);background:rgba(232,162,37,.1)}
+.btn-amber{background:var(--amber);color:#000;border-color:var(--amber);font-weight:700}
+.btn-amber:hover{background:var(--amber2);border-color:var(--amber2);color:#000}
+.btn:disabled{opacity:.35;pointer-events:none}
+.btn-ghost{background:transparent;border-color:transparent;color:var(--text3);padding:5px 8px}
+.btn-ghost:hover{color:var(--amber);background:rgba(232,162,37,.06);border-color:var(--border)}
+
+/* ── PILLS ── */
+.fmt-pill{display:inline-flex;align-items:center;padding:2px 9px;border-radius:10px;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.fmt-win{background:rgba(96,165,250,.12);color:var(--blue);border:1px solid rgba(96,165,250,.25)}
+.fmt-pf{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.fmt-mix{background:rgba(167,139,250,.1);color:var(--violet);border:1px solid rgba(167,139,250,.2)}
+
+/* ── LAYOUT ── */
+.main{display:flex;height:calc(100vh - 55px)}
+
+/* ── SIDEBAR ── */
+.sidebar{width:268px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+.sb-sec{padding:13px 15px;border-bottom:1px solid var(--border)}
+.sb-lbl{font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:var(--text3);margin-bottom:9px;display:flex;align-items:center;gap:6px}
+.sb-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* Drop zone */
+.dropzone{border:2px dashed var(--border);border-radius:6px;padding:20px 12px;text-align:center;cursor:pointer;transition:all .2s;background:var(--bg3)}
+.dropzone:hover,.dropzone.dragover{border-color:var(--amber);background:rgba(232,162,37,.05)}
+.dropzone:hover svg,.dropzone.dragover svg{color:var(--amber)!important}
+.dz-text{color:var(--text2);font-size:11px;line-height:1.7}
+.dz-text strong{color:var(--amber);display:block;margin-bottom:2px}
+#fileInput{display:none}
+
+/* Stats */
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.stat-card{background:var(--bg3);border:1px solid var(--border);border-radius:4px;padding:7px 9px}
+.sv{font-family:'Syne',sans-serif;font-weight:800;font-size:19px;color:var(--amber);line-height:1;margin-bottom:2px}
+.sv.g{color:var(--green)}.sv.r{color:var(--red)}.sv.b{color:var(--blue)}.sv.v{color:var(--violet)}.sv.o{color:var(--orange)}
+.sl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em}
+
+/* Form controls */
+input[type=text],select{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text);font-family:'JetBrains Mono',monospace;font-size:11px;padding:5px 8px;outline:none;transition:border-color .15s}
+input[type=text]:focus,select:focus{border-color:var(--amber)}
+select option{background:var(--bg3)}
+.fr2{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.fr2 label{font-size:10px;color:var(--text2);width:62px;flex-shrink:0}
+.cbx-group{display:flex;flex-direction:column;gap:5px}
+.cbx{display:flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;color:var(--text2)}
+.cbx input{accent-color:var(--amber);cursor:pointer}
+.cbx:hover{color:var(--text)}
+
+/* ── CONTENT ── */
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* Progress */
+.prog-wrap{padding:9px 15px;display:none;border-bottom:1px solid var(--border)}
+.prog-bar{height:3px;background:var(--bg4);border-radius:2px;overflow:hidden}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--amber),var(--amber2));width:0;transition:width .2s}
+.prog-txt{font-size:10px;color:var(--text3);margin-top:4px}
+
+/* Toolbar */
+.toolbar{display:flex;align-items:center;gap:8px;padding:8px 13px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;position:relative}
+.srch{flex:1;position:relative;max-width:440px}
+.srch svg{position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text3);pointer-events:none}
+.srch input{padding-left:28px}
+.res-count{font-size:11px;color:var(--text3);white-space:nowrap;margin-left:auto}
+.res-count span{color:var(--amber);font-weight:700}
+
+/* Masked badge in toolbar */
+.masked-badge{
+  display:none;align-items:center;gap:5px;
+  padding:3px 9px;border-radius:3px;font-size:10px;cursor:pointer;
+  background:rgba(249,115,22,.1);color:var(--orange);border:1px solid rgba(249,115,22,.2);
+  transition:all .15s;white-space:nowrap;
+}
+.masked-badge:hover{background:rgba(249,115,22,.2)}
+.masked-badge.visible{background:rgba(249,115,22,.2);border-color:var(--orange)}
+
+/* ── COLUMNS POPOVER ── */
+.col-btn{position:relative}
+.col-popover{
+  display:none;position:absolute;top:calc(100% + 6px);right:0;
+  background:var(--bg3);border:1px solid var(--border);border-radius:6px;
+  padding:10px;min-width:180px;z-index:300;
+  box-shadow:0 8px 32px rgba(0,0,0,.5);
+}
+.col-popover.open{display:block}
+.col-popover h5{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:8px;padding-bottom:5px;border-bottom:1px solid var(--border)}
+.col-popover .cbx{margin-bottom:4px}
+.col-popover .cbx:last-child{margin-bottom:0}
+.col-sep{height:1px;background:var(--border);margin:7px 0}
+
+/* ── TABLE ── */
+.tbl-wrap{flex:1;overflow:auto}
+table{border-collapse:collapse;table-layout:fixed;width:100%}
+colgroup col{transition:none}
+thead tr{background:var(--bg3);border-bottom:2px solid var(--border);position:sticky;top:0;z-index:10}
+th{
+  padding:7px 8px;text-align:left;font-size:10px;
+  text-transform:uppercase;letter-spacing:.1em;color:var(--text3);
+  white-space:nowrap;user-select:none;transition:color .15s;
+  position:relative;overflow:hidden;
+}
+th.sortable{cursor:pointer}
+th.sortable:hover{color:var(--amber)}
+th.sorted{color:var(--amber)}
+th.col-hidden,td.col-hidden{display:none}
+
+/* Resize handle */
+.th-resize{
+  position:absolute;right:0;top:0;bottom:0;width:5px;
+  cursor:col-resize;background:transparent;z-index:5;
+}
+.th-resize:hover,.th-resize.dragging{background:var(--amber);opacity:.5}
+
+tbody tr{border-bottom:1px solid rgba(37,45,58,.7);transition:background .1s;cursor:pointer}
+tbody tr:hover{background:rgba(232,162,37,.04)}
+tbody tr.exp-src{background:rgba(232,162,37,.07)}
+
+/* Masked (hidden/deduped) rows */
+tbody tr.masked{opacity:.4;background:rgba(249,115,22,.03)!important;cursor:pointer}
+tbody tr.masked:hover{opacity:.65;background:rgba(249,115,22,.06)!important}
+tbody tr.masked td{color:var(--text3)!important;font-style:italic}
+tbody tr.masked .badge{opacity:.6}
+
+td{padding:5px 8px;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+td.ts{color:var(--text3);font-size:10px}
+td.eid{color:var(--cyan);font-weight:700}
+td.src{color:var(--blue)}
+td.msg{color:var(--text)}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:700;letter-spacing:.04em}
+.bi{background:rgba(96,165,250,.12);color:var(--blue);border:1px solid rgba(96,165,250,.2)}
+.be{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2)}
+.bw{background:rgba(249,115,22,.12);color:var(--orange);border:1px solid rgba(249,115,22,.2)}
+.bok{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.bn{background:rgba(232,162,37,.1);color:var(--amber);border:1px solid rgba(232,162,37,.2)}
+.bd{background:rgba(88,98,109,.2);color:var(--text3);border:1px solid rgba(88,98,109,.3)}
+.bc{background:rgba(239,68,68,.2);color:#ff8080;border:1px solid rgba(239,68,68,.4)}
+.bfa{background:rgba(249,115,22,.15);color:var(--orange);border:1px solid rgba(249,115,22,.3)}
+.fmt-tag{font-size:9px;padding:1px 4px;border-radius:2px;margin-right:3px;vertical-align:middle;font-weight:700}
+.ft-win{background:rgba(96,165,250,.1);color:var(--blue)}
+.ft-pf{background:rgba(34,197,94,.1);color:var(--green)}
+.dedup-tag{font-size:9px;padding:1px 4px;border-radius:2px;margin-right:3px;vertical-align:middle;font-weight:700;background:rgba(249,115,22,.15);color:var(--orange)}
+
+/* Expand row */
+.exp-row td{padding:0;background:var(--bg3)!important;cursor:default}
+.exp-content{padding:13px 18px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.exp-sec h4{font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:7px;border-bottom:1px solid var(--border);padding-bottom:3px}
+.fl2{display:flex;flex-direction:column;gap:3px}
+.fr3{display:flex;gap:8px;font-size:11px}
+.fk{color:var(--text3);flex-shrink:0;width:150px}
+.fv{color:var(--text);word-break:break-all;white-space:pre-wrap}
+.msgbox{grid-column:1/-1;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:10px 12px;font-size:11px;color:var(--text);white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;line-height:1.7}
+.rawbox{grid-column:1/-1;background:#060809;border:1px solid var(--border);border-left:3px solid var(--green);border-radius:4px;padding:9px 12px;font-size:10px;color:var(--green);white-space:pre-wrap;word-break:break-all;line-height:1.6;font-family:'JetBrains Mono',monospace}
+
+/* Empty state */
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text3);padding:60px}
+.empty svg{opacity:.35}
+.empty h2{font-family:'Syne',sans-serif;font-size:18px;font-weight:600;color:var(--text2)}
+.empty p{font-size:12px;text-align:center;line-height:1.8;max-width:320px}
+
+/* Dist */
+.dist-row{display:flex;align-items:center;gap:7px;cursor:pointer;padding:2px 0}
+.dist-row:hover .dk{color:var(--amber)}
+.dk{font-size:10px;color:var(--cyan);width:126px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.db{flex:1;height:4px;background:var(--bg4);border-radius:2px;overflow:hidden}
+.df{height:100%;background:var(--amber);border-radius:2px}
+.dc{font-size:10px;color:var(--text3);width:28px;text-align:right;flex-shrink:0}
+
+/* Notif */
+.notif{position:fixed;bottom:20px;right:20px;background:var(--bg3);border:1px solid var(--border);border-left:3px solid var(--amber);padding:9px 14px;border-radius:4px;font-size:11px;color:var(--text);z-index:9000;transform:translateX(120%);transition:transform .25s;max-width:300px}
+.notif.show{transform:translateX(0)}
+.notif.ok{border-left-color:var(--green)}
+.notif.err{border-left-color:var(--red)}
+
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="logo">
+    <div class="logo-hex">⬡</div>
+    <div>
+      <div class="logo-name">LOG<span style="color:var(--text2)">FORGE</span></div>
+      <div class="logo-sub">Windows NDJSON · pfSense Syslog</div>
+    </div>
+  </div>
+  <div id="fmtPill" style="display:none"></div>
+  <div class="hright">
+    <button class="btn" id="btnClear" disabled>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/></svg>Effacer
+    </button>
+    <button class="btn" id="btnExport" disabled>
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Exporter
+    </button>
+    <button class="btn btn-amber" id="btnLoad">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Charger
+    </button>
+    <input type="file" id="fileInput" accept=".log,.ndjson,.json,.txt" multiple>
+  </div>
+</header>
+
+<div class="main">
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div class="sb-sec">
+      <div class="sb-lbl">Source</div>
+      <div class="dropzone" id="dropzone">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="display:block;margin:0 auto 8px;color:var(--muted)">
+          <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+        </svg>
+        <div class="dz-text"><strong>Glisser-déposer</strong>
+          <span style="color:var(--blue)">Windows NDJSON</span> · <span style="color:var(--green)">pfSense syslog</span><br>
+          <span style="color:var(--text3);font-size:10px">.log .ndjson .json · multi-fichiers</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">Stats</div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="sv"  id="sTotal">0</div><div class="sl">Total</div></div>
+        <div class="stat-card"><div class="sv g" id="sValid">0</div><div class="sl">Valides</div></div>
+        <div class="stat-card"><div class="sv r" id="sInvalid">0</div><div class="sl">Invalides</div></div>
+        <div class="stat-card"><div class="sv o" id="sDupes">0</div><div class="sl">Masqués</div></div>
+        <div class="stat-card"><div class="sv"  id="sWin">0</div><div class="sl">Windows</div></div>
+        <div class="stat-card"><div class="sv v" id="sPf">0</div><div class="sl">pfSense</div></div>
+      </div>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">Filtres</div>
+      <div class="fr2"><label>Format</label>
+        <select id="fFormat"><option value="">Tous</option><option value="windows">Windows</option><option value="pfsense">pfSense</option></select>
+      </div>
+      <div class="fr2"><label>Sévérité</label>
+        <select id="fSeverity">
+          <option value="">Tous</option>
+          <option>Emergency</option><option>Alert</option><option>Critical</option>
+          <option>Error</option><option>Warning</option><option>Notice</option>
+          <option>Info</option><option>Debug</option>
+          <option>Information</option><option>SuccessAudit</option><option>FailureAudit</option>
+        </select>
+      </div>
+      <div class="fr2"><label>Processus</label><select id="fProcess"><option value="">Tous</option></select></div>
+      <div class="fr2"><label>Channel</label><select id="fChannel"><option value="">Tous</option></select></div>
+      <div class="fr2"><label>Hôte</label><select id="fHost"><option value="">Tous</option></select></div>
+      <div class="fr2"><label>EventID</label><input type="text" id="fEventId" placeholder="ex: 4624, 7036"></div>
+      <div class="fr2" style="align-items:flex-start">
+        <label style="margin-top:3px">Utilisateur</label>
+        <div style="flex:1;position:relative">
+          <input type="text" id="fUserText" placeholder="ex: jdupont, admin..." autocomplete="off" style="width:100%">
+          <div id="userDropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg3);border:1px solid var(--border);border-radius:4px;max-height:150px;overflow-y:auto;z-index:400;margin-top:2px;box-shadow:0 6px 20px rgba(0,0,0,.5)"></div>
+        </div>
+      </div>
+      <div class="fr2" style="align-items:flex-start">
+        <label style="margin-top:3px">Période</label>
+        <div style="flex:1;display:flex;flex-direction:column;gap:4px">
+          <input type="text" id="fFrom" placeholder="YYYY-MM-DD HH:MM">
+          <input type="text" id="fTo" placeholder="YYYY-MM-DD HH:MM">
+        </div>
+      </div>
+      <button class="btn" id="btnReset" style="width:100%;justify-content:center;margin-top:7px">Réinitialiser filtres</button>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">Options conversion</div>
+      <div class="cbx-group">
+        <label class="cbx"><input type="checkbox" id="optDedup"   checked>Dédup Windows (RecordNumber+Host)</label>
+        <label class="cbx"><input type="checkbox" id="optPfDedup" checked>Dédup pfSense (msg+timestamp)</label>
+        <label class="cbx"><input type="checkbox" id="optClean"   checked>Nettoyer \r\n dans Message</label>
+        <label class="cbx"><input type="checkbox" id="optNorm"    checked>Message vide → StringInserts[0]</label>
+        <label class="cbx"><input type="checkbox" id="optUni"     checked>Décoder \\uXXXX</label>
+      </div>
+    </div>
+
+    <div class="sb-sec" id="distSec" style="display:none">
+      <div class="sb-lbl">Top processus / EventID</div>
+      <div id="distList"></div>
+    </div>
+  </aside>
+
+  <!-- ── CONTENT ── -->
+  <div class="content">
+    <div class="prog-wrap" id="progWrap">
+      <div class="prog-bar"><div class="prog-fill" id="progFill"></div></div>
+      <div class="prog-txt" id="progTxt">Chargement...</div>
+    </div>
+
+    <div class="toolbar">
+      <div class="srch">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="search" placeholder="Message, processus, IP, utilisateur, EventID...">
+      </div>
+
+      <!-- Masked events toggle -->
+      <div class="masked-badge" id="maskedBadge" title="Afficher/masquer les événements dédupliqués">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+        <span id="maskedCount">0</span> masqués
+      </div>
+
+      <!-- Columns button -->
+      <div class="col-btn" id="colBtnWrap">
+        <button class="btn" id="btnCols">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="18"/><rect x="14" y="3" width="7" height="18"/></svg>Colonnes
+        </button>
+        <div class="col-popover" id="colPopover">
+          <h5>Afficher / Masquer</h5>
+          <div id="colCheckboxes"></div>
+          <div class="col-sep"></div>
+          <button class="btn" id="btnColsReset" style="width:100%;justify-content:center;font-size:10px">Réinitialiser</button>
+        </div>
+      </div>
+
+      <div class="res-count"><span id="resNum">0</span> événements</div>
+    </div>
+
+    <div class="tbl-wrap" id="tblWrap">
+      <div class="empty" id="emptyState">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" style="color:var(--muted)">
+          <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+          <line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="15" y2="16"/>
+        </svg>
+        <h2>Aucun fichier chargé</h2>
+        <p>Supporte <strong style="color:var(--blue)">Windows NDJSON</strong> et <strong style="color:var(--green)">pfSense syslog</strong> (S3/Wasabi).</p>
+      </div>
+      <table id="logTable" style="display:none">
+        <colgroup id="colgroup"></colgroup>
+        <thead><tr id="headerRow"></tr></thead>
+        <tbody id="logBody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="notif" id="notif"></div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  COLUMN DEFINITIONS
+// ══════════════════════════════════════════════════════════════════
+const COL_DEFS = [
+  { id:'_ts',       label:'Timestamp',     sortable:true,  width:148, visible:true },
+  { id:'_host',     label:'Hôte',          sortable:true,  width:110, visible:true },
+  { id:'_id',       label:'ID / Sév.',     sortable:true,  width:90,  visible:true },
+  { id:'_severity', label:'Type',          sortable:true,  width:90,  visible:true },
+  { id:'_process',  label:'Processus',     sortable:true,  width:140, visible:true },
+  { id:'_channel',  label:'Channel',       sortable:true,  width:130, visible:true },
+  { id:'_msg',      label:'Message',       sortable:true,  width:400, visible:true },
+];
+// Working copy (allows runtime mutation)
+let cols = COL_DEFS.map(c=>Object.assign({},c));
+
+// ══════════════════════════════════════════════════════════════════
+//  SYSLOG PARSER
+// ══════════════════════════════════════════════════════════════════
+const SEV_N=['Emergency','Alert','Critical','Error','Warning','Notice','Info','Debug'];
+const FAC_N=['kern','user','mail','daemon','auth','syslog','lpr','news','uucp','cron','authpriv','ftp','ntp','security','console','cron2','local0','local1','local2','local3','local4','local5','local6','local7'];
+const SYSLOG_RE=/^<(\d+)>[A-Z][a-z]{2}\s+\d+\s+[\d:]+\s+\S+\s+\d+\s+(\S+)\s+(\S+)\s+(\d+)\s+-\s+-\s+(.*)$/s;
+function parseSyslog(raw){
+  const m=(raw||'').match(SYSLOG_RE);
+  if(!m)return{severityName:'Info',facilityName:'',appName:'',pid:'',isoTs:'',text:raw||''};
+  const p=parseInt(m[1],10),sev=p&7,fac=p>>3;
+  return{priority:p,facility:fac,severity:sev,facilityName:FAC_N[fac]||String(fac),severityName:SEV_N[sev]||'Info',isoTs:m[2],appName:m[3],pid:m[4],text:m[5].trim()};
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  FORMAT DETECTION & NORMALIZE
+// ══════════════════════════════════════════════════════════════════
+function detectFmt(ev){
+  if(ev.EventID!==undefined||ev.SourceName!==undefined)return'windows';
+  if(ev.s3_key!==undefined||(ev.date!==undefined&&typeof ev.message==='string'))return'pfsense';
+  return'unknown';
+}
+// ── Username extraction ───────────────────────────────────────────
+// pfSense: "user 'NAME'" or "NAME/1.2.3.4:port" patterns
+function extractUsersPf(text){
+  const s=new Set();
+  // explicit user 'NAME' authenticated / disconnected
+  for(const m of (text||'').matchAll(/\buser '([^']+)'/g)) s.add(m[1]);
+  // openvpn server '...' user 'NAME' address
+  for(const m of (text||'').matchAll(/\buser '([^']+)'\s+address/g)) s.add(m[1]);
+  // USERNAME/IP:port at start of openvpn message (e.g. "john_doe/1.2.3.4:12345")
+  const ipPfx=(text||'').match(/^([A-Za-z0-9][A-Za-z0-9._-]{1,})\//);
+  if(ipPfx) s.add(ipPfx[1]);
+  return [...s].filter(u=>u&&!/^\d/.test(u));
+}
+// Windows: pull from Message "Account Name:\t\tNAME" (handles multiple occurrences)
+// Also check StringInserts for dedicated logon EventIDs
+const WIN_USER_EIDS_SI={
+  4624:5, 4625:5, 4648:6, 4672:1, 4776:1, 4768:0, 4769:0, 4770:0
+};
+function extractUsersWin(ev,msg){
+  const s=new Set();
+  // From Message field — "Account Name:\t\tNAME"
+  for(const m of (msg||'').matchAll(/Account Name:\s+([^\s\r\n]+)/g)){
+    const u=m[1].trim();
+    if(u&&u!=='-'&&!u.startsWith('%%')&&!u.endsWith('$'))s.add(u);
+  }
+  // From StringInserts at known positions
+  const si=Array.isArray(ev.StringInserts)?ev.StringInserts:[];
+  const eidIdx=WIN_USER_EIDS_SI[Number(ev.EventID)];
+  if(eidIdx!=null&&si[eidIdx]&&si[eidIdx]!=='-') s.add(si[eidIdx]);
+  // EventID 4776: Logon Account is StringInserts[1]
+  if(Number(ev.EventID)===4776&&si[1]&&si[1]!=='-') s.add(si[1]);
+  return [...s].filter(u=>u&&u.length>0&&u!=='SYSTEM'&&u!=='ANONYMOUS LOGON');
+}
+
+function normalize(ev){
+  const fmt=detectFmt(ev);
+  const n=Object.assign({_fmt:fmt},ev);
+  if(fmt==='windows'){
+    let msg=ev.Message||'';
+    if(!msg.trim()&&Array.isArray(ev.StringInserts)&&ev.StringInserts.length)msg=ev.StringInserts[0]||'';
+    n._ts=ev.timestamp||ev.TimeGenerated||'';
+    n._host=ev.hostname||ev.ComputerName||'';
+    n._id=String(ev.EventID??'');
+    n._severity=ev.EventType||'Information';
+    n._process=ev.SourceName||'';
+    n._channel=ev.Channel||'';
+    n._msg=cleanMsg(decUni(msg));
+    n._rawMsg=ev.Message||'';
+    n._users=extractUsersWin(ev, ev.Message||'');
+    n._user=n._users.join(', ');
+  }else if(fmt==='pfsense'){
+    const sl=parseSyslog(ev.message||'');
+    n._syslog=sl;
+    n._ts=ev.date||'';
+    n._host=ev.hostname||'';
+    n._id=sl.priority!=null?`${sl.facilityName}.${sl.severityName}`:'';
+    n._severity=sl.severityName;
+    n._process=sl.appName||'';
+    n._channel=ev.s3_key?ev.s3_key.split('/').pop().replace(/\.log$/,''):'';
+    n._msg=sl.text;
+    n._rawMsg=ev.message||'';
+    n._users=extractUsersPf(sl.text);
+    n._user=n._users.join(', ');
+  }else{
+    n._ts=ev.timestamp||ev.date||'';n._host=ev.hostname||'';
+    n._id='';n._severity='';n._process='';n._channel='';
+    n._msg=JSON.stringify(ev).substring(0,200);n._rawMsg='';
+    n._users=[];n._user='';
+  }
+  return n;
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  TEXT UTILS
+// ══════════════════════════════════════════════════════════════════
+function decUni(s){return String(s||'').replace(/\\u([0-9A-Fa-f]{4})/g,(_,h)=>String.fromCharCode(parseInt(h,16)))}
+function cleanMsg(s){
+  return String(s||'')
+    .replace(/\\r\\n\\t/g,' | ').replace(/\\f/g,' | ').replace(/\\r\\n\\r\\n/g,' | ').replace(/\\r\\n/g,' ').replace(/\\n/g,' ').replace(/\\t/g,' ')
+    .replace(/\r\n\t/g,' | ').replace(/\r\n\r\n/g,' | ').replace(/\r\n/g,' ').replace(/\n/g,' ').replace(/\t/g,' ')
+    .replace(/  +/g,' ').replace(/(\s*\|\s*)+/g,' | ').replace(/:\s*"\s*\|\s*/g,':"').trim();
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+function fmtTs(ts){if(!ts)return'';try{return new Date(ts).toISOString().replace('T',' ').substring(0,19)}catch{return ts}}
+
+// ══════════════════════════════════════════════════════════════════
+//  BADGES
+// ══════════════════════════════════════════════════════════════════
+const WIN_B={Information:'bi INFO',Error:'be ERROR',Warning:'bw WARN',SuccessAudit:'bok AUDIT+',FailureAudit:'bfa AUDIT-'};
+const PF_B={Emergency:'bc EMERG',Alert:'bc ALERT',Critical:'bc CRIT',Error:'be ERR',Warning:'bw WARN',Notice:'bn NOTICE',Info:'bi INFO',Debug:'bd DEBUG'};
+function badge(sev,fmt){
+  const map=fmt==='pfsense'?PF_B:WIN_B;
+  const v=map[sev]||'bd '+(sev||'?');
+  const[cls,...lbl]=v.split(' ');
+  return`<span class="badge ${cls}">${lbl.join(' ')}</span>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════════════
+let allEvents=[];    // valid, deduped events
+let maskedEvents=[]; // deduped events (hidden by default)
+let allUsersList=[];
+let filtered=[];     // current view
+let showMasked=false;
+let sortCol='_ts', sortAsc=true, expandedIdx=null;
+const PAGE=200; let rendered=0;
+
+// ══════════════════════════════════════════════════════════════════
+//  PARSE
+// ══════════════════════════════════════════════════════════════════
+function parseFile(txt){
+  const lines=txt.split(/\r?\n/).filter(l=>l.trim());
+  const events=[];let invalid=0;
+  for(const line of lines){
+    const t=line.trim();
+    if(!t.startsWith('{')||!t.endsWith('}'))  {invalid++;continue}
+    try{events.push(JSON.parse(t))}catch{invalid++}
+  }
+  return{events,invalid};
+}
+function processAll(raw,opts){
+  const winSeen=new Set(),pfSeen=new Set();
+  const result=[],masked=[];let dupes=0;
+  for(const ev of raw){
+    const fmt=detectFmt(ev);
+    if(fmt==='windows'&&opts.dedup&&ev.RecordNumber!=null){
+      const k=`${ev.RecordNumber}|${ev.ComputerName}`;
+      if(winSeen.has(k)){
+        const m=normalize(Object.assign({},ev));m._masked=true;m._masked_reason='Duplicate RecordNumber';masked.push(m);
+        dupes++;continue;
+      }
+      winSeen.add(k);
+    }
+    if(fmt==='pfsense'&&opts.pfDedup){
+      const k=`${ev.date}|${(ev.message||'').substring(0,80)}`;
+      if(pfSeen.has(k)){
+        const m=normalize(Object.assign({},ev));m._masked=true;m._masked_reason='Duplicate syslog';masked.push(m);
+        dupes++;continue;
+      }
+      pfSeen.add(k);
+    }
+    let e=Object.assign({},ev);
+    if(opts.uni&&fmt==='windows'){
+      if(typeof e.Message==='string')e.Message=decUni(e.Message);
+      if(Array.isArray(e.StringInserts))e.StringInserts=e.StringInserts.map(s=>typeof s==='string'?decUni(s):s);
+    }
+    if(opts.norm&&fmt==='windows'&&(!e.Message||!e.Message.trim())&&Array.isArray(e.StringInserts)&&e.StringInserts.length)
+      e.Message=e.StringInserts[0]||'';
+    result.push(normalize(e));
+  }
+  return{result,masked,dupes};
+}
+function getOpts(){
+  return{
+    dedup:document.getElementById('optDedup').checked,
+    pfDedup:document.getElementById('optPfDedup').checked,
+    clean:document.getElementById('optClean').checked,
+    norm:document.getElementById('optNorm').checked,
+    uni:document.getElementById('optUni').checked,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  LOAD
+// ══════════════════════════════════════════════════════════════════
+function prog(p,t){document.getElementById('progWrap').style.display='block';document.getElementById('progFill').style.width=p+'%';document.getElementById('progTxt').textContent=t}
+function progHide(){document.getElementById('progWrap').style.display='none'}
+
+async function loadFiles(files){
+  prog(0,'Lecture...');
+  let rawAll=[],totalInvalid=0;
+  for(let i=0;i<files.length;i++){
+    prog((i/files.length)*40,`Lecture : ${files[i].name}`);
+    const{events,invalid}=parseFile(await files[i].text());
+    rawAll=rawAll.concat(events);totalInvalid+=invalid;
+  }
+  prog(50,'Traitement...');
+  const{result,masked,dupes}=processAll(rawAll,getOpts());
+  allEvents=result; maskedEvents=masked;
+  prog(75,'Filtres...');
+  buildSelects();
+  prog(90,'Rendu...');
+  applyFilters();
+  const nWin=allEvents.filter(e=>e._fmt==='windows').length;
+  const nPf=allEvents.filter(e=>e._fmt==='pfsense').length;
+  updateStats(rawAll.length+totalInvalid+dupes,allEvents.length,totalInvalid,dupes,nWin,nPf);
+  buildDist();showFmtPill(nWin,nPf);
+  updateMaskedBadge();
+  progHide();
+  document.getElementById('btnClear').disabled=false;
+  document.getElementById('btnExport').disabled=false;
+  document.getElementById('distSec').style.display='';
+  notify(`${allEvents.length} événements — ${dupes} dédupliqués`,'ok');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SELECTS / STATS / DIST
+// ══════════════════════════════════════════════════════════════════
+function fillSel(id,vals){
+  const s=document.getElementById(id),cur=s.value;
+  s.innerHTML='<option value="">Tous</option>'+vals.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+  if(vals.includes(cur))s.value=cur;
+}
+function buildSelects(){
+  const uniq=k=>[...new Set(allEvents.map(e=>e[k]).filter(Boolean))].sort();
+  fillSel('fProcess',uniq('_process'));
+  fillSel('fChannel',uniq('_channel'));
+  fillSel('fHost',uniq('_host'));
+  // Build user list from _users arrays
+  const userSet=new Set();
+  for(const e of allEvents)(e._users||[]).forEach(u=>userSet.add(u));
+  allUsersList=[...userSet].sort((a,b)=>a.toLowerCase().localeCompare(b.toLowerCase()));
+}
+function updateStats(total,valid,invalid,dupes,win,pf){
+  document.getElementById('sTotal').textContent=total;
+  document.getElementById('sValid').textContent=valid;
+  document.getElementById('sInvalid').textContent=invalid;
+  document.getElementById('sDupes').textContent=dupes;
+  document.getElementById('sWin').textContent=win;
+  document.getElementById('sPf').textContent=pf;
+}
+function buildDist(){
+  const c={};
+  for(const e of allEvents){const k=e._fmt==='windows'?`EID:${e._id}`:e._process||'?';c[k]=(c[k]||0)+1}
+  const s=Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const max=s[0]?.[1]||1;
+  document.getElementById('distList').innerHTML=s.map(([k,n])=>`
+    <div class="dist-row" onclick="quickFilter('${k.replace(/'/g,"\\'")}')">
+      <span class="dk" title="${esc(k)}">${esc(k)}</span>
+      <div class="db"><div class="df" style="width:${(n/max*100).toFixed(0)}%"></div></div>
+      <span class="dc">${n}</span>
+    </div>`).join('');
+}
+function quickFilter(k){
+  if(k.startsWith('EID:')){document.getElementById('fEventId').value=k.slice(4);document.getElementById('fProcess').value=''}
+  else{document.getElementById('fProcess').value=k;document.getElementById('fEventId').value=''}
+  applyFilters();
+}
+function showFmtPill(win,pf){
+  const el=document.getElementById('fmtPill');el.style.display='';
+  if(win&&pf)el.innerHTML=`<span class="fmt-pill fmt-mix">WIN + pfSense</span>`;
+  else if(win)el.innerHTML=`<span class="fmt-pill fmt-win">Windows NDJSON</span>`;
+  else if(pf)el.innerHTML=`<span class="fmt-pill fmt-pf">pfSense Syslog</span>`;
+  else el.style.display='none';
+}
+function updateMaskedBadge(){
+  const badge=document.getElementById('maskedBadge');
+  const count=maskedEvents.length;
+  document.getElementById('maskedCount').textContent=count;
+  badge.style.display=count>0?'inline-flex':'none';
+  badge.classList.toggle('visible',showMasked);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  FILTERS
+// ══════════════════════════════════════════════════════════════════
+function applyFilters(){
+  const q=document.getElementById('search').value.toLowerCase().trim();
+  const fFmt=document.getElementById('fFormat').value;
+  const fSev=document.getElementById('fSeverity').value;
+  const fProc=document.getElementById('fProcess').value;
+  const fChan=document.getElementById('fChannel').value;
+  const fHost=document.getElementById('fHost').value;
+  const fEid=document.getElementById('fEventId').value.trim();
+  const fUser=(document.getElementById('fUserText').value||'').trim().toLowerCase();
+  const fFrom=document.getElementById('fFrom').value.trim();
+  const fTo=document.getElementById('fTo').value.trim();
+  const eids=fEid?fEid.split(',').map(s=>s.trim()):[];
+  function test(e){
+    if(fFmt&&e._fmt!==fFmt)return false;
+    if(fSev&&e._severity!==fSev)return false;
+    if(fProc&&e._process!==fProc)return false;
+    if(fChan&&e._channel!==fChan)return false;
+    if(fHost&&e._host!==fHost)return false;
+    if(eids.length&&!eids.includes(e._id))return false;
+    if(fUser){
+      const match=(e._users||[]).some(u=>u.toLowerCase().includes(fUser));
+      if(!match)return false;
+    }
+    if(fFrom){const t=new Date(e._ts);if(isNaN(t)||t<new Date(fFrom))return false}
+    if(fTo){const t=new Date(e._ts);if(isNaN(t)||t>new Date(fTo))return false}
+    if(q){
+      const hay=[e._msg,e._id,e._process,e._channel,e._host,e._user||'',
+        Array.isArray(e.StringInserts)?e.StringInserts.join(' '):'',e._rawMsg||''].join(' ').toLowerCase();
+      if(!hay.includes(q))return false;
+    }
+    return true;
+  }
+  filtered=allEvents.filter(test);
+  // Append visible masked events at end
+  if(showMasked){
+    const fm=maskedEvents.filter(test);
+    filtered=filtered.concat(fm);
+  }
+  sortData();renderTable();
+  document.getElementById('resNum').textContent=filtered.length;
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  SORT & RENDER
+// ══════════════════════════════════════════════════════════════════
+function sortData(){
+  filtered.sort((a,b)=>{
+    // Normal events before masked
+    if(a._masked&&!b._masked)return 1;
+    if(!a._masked&&b._masked)return -1;
+    let va=a[sortCol]??'',vb=b[sortCol]??'';
+    if(sortCol==='_ts'){va=new Date(va).getTime()||0;vb=new Date(vb).getTime()||0}
+    else{va=String(va).toLowerCase();vb=String(vb).toLowerCase()}
+    return sortAsc?(va<vb?-1:va>vb?1:0):(va>vb?-1:va<vb?1:0);
+  });
+}
+function renderTable(){
+  const body=document.getElementById('logBody');
+  const tbl=document.getElementById('logTable');
+  const emp=document.getElementById('emptyState');
+  expandedIdx=null;
+  if(!filtered.length){
+    tbl.style.display='none';emp.style.display='flex';
+    emp.querySelector('h2').textContent=allEvents.length?'Aucun résultat':'Aucun fichier chargé';
+    return;
+  }
+  tbl.style.display='';emp.style.display='none';
+  rendered=0;body.innerHTML='';
+  appendRows(Math.min(PAGE,filtered.length));
+  applyColVisibility();
+}
+function appendRows(count){
+  const body=document.getElementById('logBody');
+  const frag=document.createDocumentFragment();
+  const end=Math.min(rendered+count,filtered.length);
+  for(let i=rendered;i<end;i++){
+    const e=filtered[i];
+    const tr=document.createElement('tr');
+    tr.dataset.idx=i;
+    if(e._masked)tr.classList.add('masked');
+    const ftag=e._fmt==='pfsense'?`<span class="fmt-tag ft-pf">PF</span>`:`<span class="fmt-tag ft-win">WIN</span>`;
+    const maskedTag=e._masked?`<span class="dedup-tag">DEDUP</span>`:'';
+    const idCell=e._fmt==='pfsense'
+      ?(e._syslog?`<span style="color:var(--violet);font-size:10px">${esc((e._syslog.facilityName||'').substring(0,8))}·${e._syslog.severity??''}</span>`:'')
+      :`<span class="eid">${esc(e._id)}</span>`;
+    const shortCh=(e._channel||'').replace('Microsoft-Windows-','').replace('/Operational','').substring(0,22);
+    const shortPr=(e._process||'').replace('Microsoft-Windows-','').substring(0,22);
+    const userTag=e._user?`<span style="color:var(--cyan);font-size:10px;margin-left:3px">[${esc(e._user.substring(0,30))}]</span>`:'';
+    tr.innerHTML=`
+      <td class="ts" data-colidx="0">${fmtTs(e._ts)}</td>
+      <td data-colidx="1">${ftag}${maskedTag}${esc(e._host)}</td>
+      <td data-colidx="2">${idCell}</td>
+      <td data-colidx="3">${badge(e._severity,e._fmt)}</td>
+      <td class="src" data-colidx="4" title="${esc(e._process)}">${esc(shortPr)}</td>
+      <td data-colidx="5" style="color:var(--text3);font-size:10px" title="${esc(e._channel)}">${esc(shortCh)}</td>
+      <td class="msg" data-colidx="6">${esc((e._msg||'').substring(0,140))}${userTag}</td>`;
+    tr.addEventListener('click',()=>toggleExpand(tr,i));
+    frag.appendChild(tr);
+  }
+  body.appendChild(frag);rendered=end;
+  applyColVisibilityToRange(rendered-count,rendered);
+}
+
+document.getElementById('tblWrap').addEventListener('scroll',function(){
+  if(rendered>=filtered.length)return;
+  if(this.scrollTop+this.clientHeight>this.scrollHeight-300)appendRows(PAGE);
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  EXPAND ROW
+// ══════════════════════════════════════════════════════════════════
+function toggleExpand(tr,idx){
+  document.querySelector('tr.exp-src')?.classList.remove('exp-src');
+  document.querySelector('tr.exp-row')?.remove();
+  if(expandedIdx===idx){expandedIdx=null;return}
+  expandedIdx=idx;tr.classList.add('exp-src');
+  const e=filtered[idx];
+  const row=document.createElement('tr');row.className='exp-row';
+  const td=document.createElement('td');td.colSpan=cols.length;
+  const maskedNote=e._masked?`<div style="background:rgba(249,115,22,.08);border:1px solid rgba(249,115,22,.2);border-radius:4px;padding:6px 10px;margin-bottom:4px;font-size:11px;color:var(--orange)">⚠ Événement masqué (dédupliqué) — Raison : ${esc(e._masked_reason||'')}</div>`:'';
+  const userNote=e._users&&e._users.length?`<div style="background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.15);border-radius:4px;padding:6px 10px;margin-bottom:4px;font-size:11px;color:var(--cyan)">👤 Utilisateur(s) : <strong>${esc(e._users.join(' · '))}</strong></div>`:'';
+  const topNotes=(maskedNote||userNote)?`<div style="grid-column:1/-1;display:flex;flex-direction:column;gap:4px">${maskedNote}${userNote}</div>`:'';
+  if(e._fmt==='windows'){
+    const left=[['EventID',e.EventID],['EventType',e.EventType],['SourceName',e.SourceName],['Channel',e.Channel],['RecordNumber',e.RecordNumber],['Sid',e.Sid],['hostname',e.hostname],['ComputerName',e.ComputerName]];
+    const right=[['TimeGenerated',e.TimeGenerated],['TimeWritten',e.TimeWritten],['timestamp',e.timestamp],['EventCategory',e.EventCategory],['Qualifiers',e.Qualifiers]];
+    const si=Array.isArray(e.StringInserts)?e.StringInserts.map((s,i)=>`<div class="fr3"><span class="fk">[${i}]</span><span class="fv">${esc(s)}</span></div>`).join(''):'';
+    const msg=(e.Message||e._msg||'').trim();
+    td.innerHTML=`<div class="exp-content">${topNotes}
+      <div class="exp-sec"><h4>Métadonnées</h4><div class="fl2">${left.filter(([,v])=>v!=null&&v!=='').map(([k,v])=>`<div class="fr3"><span class="fk">${k}</span><span class="fv">${esc(String(v))}</span></div>`).join('')}</div></div>
+      <div class="exp-sec"><h4>Timestamps</h4><div class="fl2">${right.filter(([,v])=>v!=null&&v!=='').map(([k,v])=>`<div class="fr3"><span class="fk">${k}</span><span class="fv">${esc(String(v))}</span></div>`).join('')}</div>${si?`<h4 style="margin-top:10px">StringInserts</h4><div class="fl2">${si}</div>`:''}</div>
+      ${msg?`<div class="exp-sec" style="grid-column:1/-1"><h4>Message</h4><div class="msgbox">${esc(msg)}</div></div>`:''}
+    </div>`;
+  }else if(e._fmt==='pfsense'){
+    const sl=e._syslog||{};
+    const meta=[['hostname',e.hostname],['Appname / PID',`${sl.appName||''} : ${sl.pid||''}`],['Facility',sl.facilityName?`${sl.facilityName} (${sl.facility})`:''],['Severity',sl.severityName?`${sl.severityName} (${sl.severity})`:''],['Priority',sl.priority],['s3_key',e.s3_key],['date (UTC)',e.date],['ISO Timestamp',sl.isoTs]];
+    td.innerHTML=`<div class="exp-content">${topNotes}
+      <div class="exp-sec"><h4>Syslog Métadonnées</h4><div class="fl2">${meta.filter(([,v])=>v!=null&&v!=='').map(([k,v])=>`<div class="fr3"><span class="fk">${k}</span><span class="fv">${esc(String(v))}</span></div>`).join('')}</div></div>
+      <div class="exp-sec"><h4>Message parsé</h4><div class="fl2"><div class="fr3"><span class="fk">Texte</span><span class="fv">${esc(sl.text||'')}</span></div></div></div>
+      <div class="exp-sec" style="grid-column:1/-1"><h4>Raw syslog</h4><div class="rawbox">${esc(e.message||'')}</div></div>
+    </div>`;
+  }
+  row.appendChild(td);tr.after(row);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  COLUMNS — VISIBILITY & RESIZE
+// ══════════════════════════════════════════════════════════════════
+function buildTable(){
+  // Build colgroup
+  const cg=document.getElementById('colgroup');
+  cg.innerHTML='';
+  cols.forEach(c=>{
+    const col=document.createElement('col');
+    col.id='col_'+c.id;
+    col.style.width=c.width+'px';
+    if(!c.visible)col.style.display='none';
+    cg.appendChild(col);
+  });
+  // Build header
+  const hr=document.getElementById('headerRow');
+  hr.innerHTML='';
+  cols.forEach((c,i)=>{
+    const th=document.createElement('th');
+    th.dataset.colidx=i;
+    th.dataset.col=c.id;
+    if(c.sortable)th.classList.add('sortable');
+    if(!c.visible)th.classList.add('col-hidden');
+    th.innerHTML=`${c.label} <span class="sort-arrow">${sortCol===c.id?(sortAsc?'↓':'↑'):'↕'}</span>`;
+    // Resize handle
+    const handle=document.createElement('div');
+    handle.className='th-resize';
+    handle.addEventListener('mousedown',e=>startResize(e,i));
+    th.appendChild(handle);
+    if(c.sortable)th.addEventListener('click',e=>{
+      if(e.target.classList.contains('th-resize'))return;
+      if(sortCol===c.id)sortAsc=!sortAsc;else{sortCol=c.id;sortAsc=true}
+      hr.querySelectorAll('th').forEach(t=>{const s=t.querySelector('.sort-arrow');if(s)s.textContent='↕'});
+      th.querySelector('.sort-arrow').textContent=sortAsc?'↓':'↑';
+      th.classList.add('sorted');
+      sortData();renderTable();
+    });
+    hr.appendChild(th);
+  });
+  // Restore sorted highlight
+  hr.querySelectorAll('th').forEach(th=>{if(th.dataset.col===sortCol)th.classList.add('sorted')});
+  // Build checkbox list
+  buildColCheckboxes();
+}
+function buildColCheckboxes(){
+  const wrap=document.getElementById('colCheckboxes');
+  wrap.innerHTML='';
+  cols.forEach((c,i)=>{
+    const label=document.createElement('label');
+    label.className='cbx';
+    const cb=document.createElement('input');
+    cb.type='checkbox'; cb.checked=c.visible; cb.dataset.colidx=i;
+    cb.addEventListener('change',()=>{cols[i].visible=cb.checked;applyColVisibility()});
+    label.appendChild(cb);
+    label.append(' '+c.label);
+    wrap.appendChild(label);
+  });
+}
+function applyColVisibility(){
+  const tbl=document.getElementById('logTable');
+  if(tbl.style.display==='none')return;
+  cols.forEach((c,i)=>{
+    // colgroup col
+    const col=document.getElementById('col_'+c.id);
+    if(col)col.style.display=c.visible?'':'none';
+    // Header th
+    const th=document.querySelector(`th[data-colidx="${i}"]`);
+    if(th)th.classList.toggle('col-hidden',!c.visible);
+    // Body tds
+    tbl.querySelectorAll(`td[data-colidx="${i}"]`).forEach(td=>td.classList.toggle('col-hidden',!c.visible));
+  });
+  // Update checkboxes
+  document.querySelectorAll('#colCheckboxes input').forEach(cb=>{
+    cb.checked=cols[parseInt(cb.dataset.colidx)].visible;
+  });
+}
+function applyColVisibilityToRange(start,end){
+  cols.forEach((c,i)=>{
+    if(c.visible)return;
+    const body=document.getElementById('logBody');
+    const rows=body.querySelectorAll('tr');
+    for(let r=start;r<Math.min(end,rows.length);r++){
+      const td=rows[r]?.querySelector(`td[data-colidx="${i}"]`);
+      if(td)td.classList.add('col-hidden');
+    }
+  });
+}
+
+// ── Column Resize ─────────────────────────────────────────────────
+let resizeState=null;
+function startResize(e,colIdx){
+  e.stopPropagation();e.preventDefault();
+  const startX=e.clientX;
+  const startW=cols[colIdx].width;
+  const handle=e.target;handle.classList.add('dragging');
+  const onMove=ev=>{
+    const delta=ev.clientX-startX;
+    const newW=Math.max(40,startW+delta);
+    cols[colIdx].width=newW;
+    const col=document.getElementById('col_'+cols[colIdx].id);
+    if(col)col.style.width=newW+'px';
+  };
+  const onUp=()=>{
+    handle.classList.remove('dragging');
+    document.removeEventListener('mousemove',onMove);
+    document.removeEventListener('mouseup',onUp);
+  };
+  document.addEventListener('mousemove',onMove);
+  document.addEventListener('mouseup',onUp);
+}
+
+// ── Col popover open/close ────────────────────────────────────────
+document.getElementById('btnCols').addEventListener('click',e=>{
+  e.stopPropagation();
+  document.getElementById('colPopover').classList.toggle('open');
+});
+document.addEventListener('click',e=>{
+  if(!document.getElementById('colBtnWrap').contains(e.target))
+    document.getElementById('colPopover').classList.remove('open');
+});
+document.getElementById('btnColsReset').addEventListener('click',()=>{
+  cols=COL_DEFS.map(c=>Object.assign({},c));
+  buildTable();applyFilters();
+});
+
+// ── Masked toggle ─────────────────────────────────────────────────
+document.getElementById('maskedBadge').addEventListener('click',()=>{
+  showMasked=!showMasked;
+  document.getElementById('maskedBadge').classList.toggle('visible',showMasked);
+  applyFilters();
+  notify(showMasked?`${maskedEvents.length} événements masqués affichés`:'Événements masqués cachés');
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  EXPORT
+// ══════════════════════════════════════════════════════════════════
+const INTERN=['_fmt','_ts','_host','_id','_severity','_process','_channel','_msg','_rawMsg','_syslog','_masked','_masked_reason','_user','_users'];
+document.getElementById('btnExport').addEventListener('click',()=>{
+  const lines=filtered.filter(e=>!e._masked).map(e=>{
+    const o=Object.assign({},e);INTERN.forEach(k=>delete o[k]);return JSON.stringify(o);
+  });
+  const blob=new Blob([lines.join('\n')],{type:'application/x-ndjson'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download=`export_${Date.now()}.ndjson`;a.click();
+  URL.revokeObjectURL(url);
+  notify(`${lines.length} lignes exportées`,'ok');
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  WIRE UP
+// ══════════════════════════════════════════════════════════════════
+document.getElementById('btnLoad').addEventListener('click',()=>document.getElementById('fileInput').click());
+document.getElementById('fileInput').addEventListener('change',e=>{if(e.target.files.length)loadFiles(e.target.files)});
+const dz=document.getElementById('dropzone');
+dz.addEventListener('click',()=>document.getElementById('fileInput').click());
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('dragover')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('dragover'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('dragover');if(e.dataTransfer.files.length)loadFiles(e.dataTransfer.files)});
+document.addEventListener('dragover',e=>e.preventDefault());
+document.addEventListener('drop',e=>{e.preventDefault();if(e.dataTransfer.files.length)loadFiles(e.dataTransfer.files)});
+
+document.getElementById('btnClear').addEventListener('click',()=>{
+  allEvents=[];filtered=[];maskedEvents=[];allUsersList=[];showMasked=false;
+  document.getElementById('logBody').innerHTML='';
+  document.getElementById('logTable').style.display='none';
+  document.getElementById('emptyState').style.display='flex';
+  document.getElementById('distSec').style.display='none';
+  document.getElementById('fmtPill').style.display='none';
+  document.getElementById('maskedBadge').style.display='none';
+  document.getElementById('btnClear').disabled=true;
+  document.getElementById('btnExport').disabled=true;
+  document.getElementById('fileInput').value='';
+  updateStats(0,0,0,0,0,0);
+  document.getElementById('resNum').textContent='0';
+});
+
+document.getElementById('btnReset').addEventListener('click',()=>{
+  ['search','fEventId','fFrom','fTo','fUserText'].forEach(id=>document.getElementById(id).value='');
+  ['fFormat','fSeverity','fProcess','fChannel','fHost'].forEach(id=>document.getElementById(id).value='');
+  userDd.style.display='none';
+  applyFilters();
+});
+
+['search','fEventId','fFormat','fSeverity','fProcess','fChannel','fHost','fFrom','fTo'].forEach(id=>{
+  const el=document.getElementById(id);
+  el.addEventListener('input',applyFilters);
+  el.addEventListener('change',applyFilters);
+});
+
+// ── User autocomplete ─────────────────────────────────────────────
+const userInput=document.getElementById('fUserText');
+const userDd=document.getElementById('userDropdown');
+function showUserDd(q){
+  if(!q){userDd.style.display='none';return}
+  const matches=allUsersList.filter(u=>u.toLowerCase().includes(q.toLowerCase())).slice(0,20);
+  if(!matches.length){userDd.style.display='none';return}
+  userDd.innerHTML=matches.map(u=>`
+    <div style="padding:5px 9px;cursor:pointer;font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+      onmousedown="selectUser('${u.replace(/'/g,"\\'")}')">
+      ${esc(u)}
+    </div>`).join('');
+  userDd.style.display='block';
+}
+function selectUser(u){
+  userInput.value=u;
+  userDd.style.display='none';
+  applyFilters();
+}
+userInput.addEventListener('input',()=>{showUserDd(userInput.value);applyFilters()});
+userInput.addEventListener('focus',()=>{if(userInput.value)showUserDd(userInput.value)});
+userInput.addEventListener('blur',()=>setTimeout(()=>userDd.style.display='none',150));
+// expose globally for inline onclick
+window.selectUser=selectUser;
+
+function notify(msg,type='info'){
+  const el=document.getElementById('notif');
+  el.textContent=msg;el.className=`notif ${type} show`;
+  clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('show'),3200);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────
+buildTable();
+</script>
+</body>
+</html>
