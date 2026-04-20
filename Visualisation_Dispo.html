@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rapport Dispo — Infra LBS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Instrument+Serif&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #f4f1ea;
+    --ink: #1a1a1a;
+    --accent: #c94f2f;
+    --accent-soft: #e8a896;
+    --green: #2d5f3f;
+    --amber: #b8860b;
+    --red: #8b1e1e;
+    --line: rgba(26, 26, 26, 0.12);
+    --line-strong: rgba(26, 26, 26, 0.35);
+    --paper: #faf7f0;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    line-height: 1.5;
+    min-height: 100vh;
+    padding: 40px 24px;
+    background-image:
+      radial-gradient(circle at 20% 10%, rgba(201, 79, 47, 0.04) 0%, transparent 40%),
+      radial-gradient(circle at 80% 60%, rgba(45, 95, 63, 0.04) 0%, transparent 40%);
+  }
+
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+
+  /* HEADER */
+  header {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    padding-bottom: 32px;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 48px;
+    gap: 24px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin-bottom: 16px;
+  }
+
+  h1 {
+    font-family: 'Instrument Serif', serif;
+    font-weight: 400;
+    font-size: clamp(48px, 7vw, 96px);
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+  }
+
+  h1 em {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .meta {
+    text-align: right;
+    font-size: 12px;
+    color: rgba(26, 26, 26, 0.7);
+  }
+
+  .meta-row {
+    margin-bottom: 4px;
+  }
+
+  .meta-row strong {
+    color: var(--ink);
+    margin-left: 8px;
+  }
+
+  /* DROP ZONE */
+  .dropzone {
+    border: 2px dashed var(--line-strong);
+    padding: 60px 40px;
+    text-align: center;
+    background: var(--paper);
+    margin-bottom: 48px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+  }
+
+  .dropzone:hover,
+  .dropzone.dragover {
+    border-color: var(--accent);
+    background: #fff;
+    transform: translateY(-2px);
+    box-shadow: 8px 8px 0 var(--line);
+  }
+
+  .dropzone-icon {
+    font-family: 'Instrument Serif', serif;
+    font-size: 72px;
+    line-height: 1;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .dropzone-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .dropzone-sub {
+    font-size: 12px;
+    color: rgba(26, 26, 26, 0.6);
+  }
+
+  .dropzone input {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  /* GLOBAL METRIC */
+  .global-metric {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    margin-bottom: 48px;
+    border: 2px solid var(--ink);
+  }
+
+  .metric-block {
+    padding: 40px 32px;
+    position: relative;
+  }
+
+  .metric-block:first-child {
+    border-right: 2px solid var(--ink);
+  }
+
+  .metric-label {
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: rgba(26, 26, 26, 0.6);
+    margin-bottom: 12px;
+  }
+
+  .metric-value {
+    font-family: 'Instrument Serif', serif;
+    font-size: clamp(72px, 10vw, 120px);
+    line-height: 1;
+    font-weight: 400;
+    letter-spacing: -0.03em;
+  }
+
+  .metric-value .unit {
+    font-size: 0.4em;
+    color: var(--accent);
+    vertical-align: super;
+  }
+
+  .metric-sub {
+    margin-top: 16px;
+    font-size: 12px;
+    color: rgba(26, 26, 26, 0.7);
+  }
+
+  .status-bar {
+    margin-top: 20px;
+    height: 6px;
+    background: var(--line);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .status-fill {
+    height: 100%;
+    background: var(--green);
+    transition: width 1s ease-out;
+  }
+
+  .status-fill.warn { background: var(--amber); }
+  .status-fill.bad { background: var(--red); }
+
+  /* SECTION TITLE */
+  .section-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 36px;
+    font-weight: 400;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .section-title em {
+    color: var(--accent);
+    font-style: italic;
+  }
+
+  .section-sub {
+    font-size: 12px;
+    color: rgba(26, 26, 26, 0.6);
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* STATS GRID */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0;
+    margin-bottom: 48px;
+    border: 1px solid var(--ink);
+  }
+
+  .stat-cell {
+    padding: 20px;
+    border-right: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .stat-cell:last-child { border-right: none; }
+
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(26, 26, 26, 0.6);
+    margin-bottom: 8px;
+  }
+
+  .stat-val {
+    font-family: 'Instrument Serif', serif;
+    font-size: 32px;
+    line-height: 1;
+  }
+
+  /* SERVERS TABLE */
+  .servers {
+    background: var(--paper);
+    border: 1px solid var(--ink);
+    margin-bottom: 48px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  thead {
+    background: var(--ink);
+    color: var(--paper);
+  }
+
+  th {
+    padding: 14px 16px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  th.num {
+    text-align: right;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--line);
+    transition: background 0.15s ease;
+  }
+
+  tbody tr:hover {
+    background: #fff;
+  }
+
+  tbody tr:last-child {
+    border-bottom: none;
+  }
+
+  td {
+    padding: 14px 16px;
+    font-size: 12px;
+  }
+
+  td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  td.server-name {
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .pill {
+    display: inline-block;
+    padding: 3px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    border-radius: 2px;
+  }
+
+  .pill-ok {
+    background: rgba(45, 95, 63, 0.12);
+    color: var(--green);
+  }
+
+  .pill-warn {
+    background: rgba(184, 134, 11, 0.15);
+    color: var(--amber);
+  }
+
+  .pill-bad {
+    background: rgba(139, 30, 30, 0.12);
+    color: var(--red);
+  }
+
+  /* EMPTY STATE */
+  .empty {
+    text-align: center;
+    padding: 80px 20px;
+    color: rgba(26, 26, 26, 0.5);
+  }
+
+  .empty-title {
+    font-family: 'Instrument Serif', serif;
+    font-size: 32px;
+    margin-bottom: 12px;
+    color: var(--ink);
+  }
+
+  footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: rgba(26, 26, 26, 0.5);
+  }
+
+  .hidden { display: none !important; }
+
+  /* Decorative element */
+  .mark {
+    display: inline-block;
+    font-family: 'Instrument Serif', serif;
+    color: var(--accent);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div>
+      <div class="eyebrow">ISO 27001 · Clause 9.1 · LBS</div>
+      <h1>Rapport de <em>Disponibilité</em></h1>
+    </div>
+    <div class="meta">
+      <div class="meta-row">Généré le <strong id="meta-date">—</strong></div>
+      <div class="meta-row">Source <strong>Action1</strong></div>
+      <div class="meta-row">Périmètre <strong>Serveurs Windows</strong></div>
+    </div>
+  </header>
+
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">&#8599;</div>
+    <div class="dropzone-title">Déposer le rapport Action1</div>
+    <div class="dropzone-sub">Fichier HTML exporté depuis Action1 — ou cliquer pour parcourir</div>
+    <input type="file" id="fileInput" accept=".html,.htm,.csv,.txt">
+  </div>
+
+  <div id="results" class="hidden">
+
+    <div class="global-metric">
+      <div class="metric-block">
+        <div class="metric-label">Disponibilité moyenne — Heures ouvrables</div>
+        <div class="metric-value" id="global-ho">—<span class="unit">%</span></div>
+        <div class="metric-sub" id="global-ho-sub">Lun–Ven · 08h00–18h00</div>
+        <div class="status-bar"><div class="status-fill" id="bar-ho" style="width:0%"></div></div>
+      </div>
+      <div class="metric-block">
+        <div class="metric-label">Disponibilité moyenne — 24/7</div>
+        <div class="metric-value" id="global-24h">—<span class="unit">%</span></div>
+        <div class="metric-sub" id="global-24h-sub">Incluant nuits et week-ends</div>
+        <div class="status-bar"><div class="status-fill" id="bar-24h" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="section-title">Synthèse de la <em>flotte</em></div>
+    <div class="section-sub">Chiffres agrégés sur la période analysée</div>
+
+    <div class="stats-grid">
+      <div class="stat-cell">
+        <div class="stat-label">Serveurs</div>
+        <div class="stat-val" id="stat-count">—</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Période</div>
+        <div class="stat-val" id="stat-period" style="font-size:14px; padding-top:8px">—</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Événements downtime</div>
+        <div class="stat-val" id="stat-events">—</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Dispo totale HO</div>
+        <div class="stat-val" id="stat-dispho">—</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Dispo totale 24/7</div>
+        <div class="stat-val" id="stat-disp24">—</div>
+      </div>
+    </div>
+
+    <div class="section-title">Détail par <em>serveur</em></div>
+    <div class="section-sub">Triés par disponibilité croissante · les plus bas en premier</div>
+
+    <div class="servers">
+      <table>
+        <thead>
+          <tr>
+            <th>Serveur</th>
+            <th class="num">Dispo HO</th>
+            <th class="num">Dispo 24/7</th>
+            <th class="num">Indispo HO</th>
+            <th class="num">Indispo 24/7</th>
+            <th class="num">Events</th>
+            <th>Statut</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <div id="empty" class="empty">
+    <div class="empty-title">En attente d'un rapport</div>
+    <div>Dépose le fichier <span class="mark">Dispo Serveurs clients</span> exporté depuis Action1</div>
+  </div>
+
+  <footer>
+    <span>LBS — Mesurage SMSI / §9.1</span>
+    <span>Cible : <strong>≥ 99 %</strong> disponibilité HO</span>
+  </footer>
+</div>
+
+<script>
+  const TARGET = 99.0;
+
+  const dropzone = document.getElementById('dropzone');
+  const fileInput = document.getElementById('fileInput');
+  const resultsEl = document.getElementById('results');
+  const emptyEl = document.getElementById('empty');
+
+  document.getElementById('meta-date').textContent = new Date().toLocaleDateString('fr-FR', {
+    day: '2-digit', month: 'long', year: 'numeric'
+  });
+
+  ['dragenter', 'dragover'].forEach(ev => {
+    dropzone.addEventListener(ev, e => {
+      e.preventDefault();
+      dropzone.classList.add('dragover');
+    });
+  });
+  ['dragleave', 'drop'].forEach(ev => {
+    dropzone.addEventListener(ev, e => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+    });
+  });
+  dropzone.addEventListener('drop', e => {
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+  fileInput.addEventListener('change', e => {
+    const file = e.target.files[0];
+    if (file) handleFile(file);
+  });
+
+  function handleFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => parseAndRender(e.target.result);
+    reader.readAsText(file, 'UTF-8');
+  }
+
+  /**
+   * Parseur flexible :
+   * - HTML (extrait les lignes des tables)
+   * - CSV / TXT tabulé
+   * Cherche des lignes avec { EndpointName, Nom, Valeur }.
+   */
+  function parseAndRender(content) {
+    const rows = [];
+
+    // Essai 1 : extraction HTML (table)
+    if (content.trim().startsWith('<') || content.includes('<table') || content.includes('<tr')) {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(content, 'text/html');
+      const trs = doc.querySelectorAll('tr');
+      trs.forEach(tr => {
+        const cells = Array.from(tr.querySelectorAll('td,th')).map(c => c.textContent.trim());
+        if (cells.length >= 3) rows.push(cells);
+      });
+    }
+
+    // Essai 2 : tabulé / CSV
+    if (rows.length === 0) {
+      const lines = content.split(/\r?\n/).filter(l => l.trim());
+      for (const line of lines) {
+        let cells;
+        if (line.includes('\t')) {
+          cells = line.split('\t').map(s => s.trim());
+        } else if (line.includes(',')) {
+          // CSV simple (ne gère pas les guillemets imbriqués complexes)
+          cells = line.split(',').map(s => s.trim().replace(/^"|"$/g, ''));
+        } else {
+          continue;
+        }
+        if (cells.length >= 3) rows.push(cells);
+      }
+    }
+
+    // Détecter les colonnes : on cherche un header contenant Endpoint, Nom, Valeur
+    let headerIdx = -1;
+    let colEndpoint = -1, colNom = -1, colValeur = -1;
+
+    for (let i = 0; i < Math.min(rows.length, 20); i++) {
+      const r = rows[i].map(c => c.toLowerCase());
+      const eIdx = r.findIndex(c => c.includes('endpoint'));
+      const nIdx = r.findIndex(c => c === 'nom' || c === 'checkname' || c.includes('nom'));
+      const vIdx = r.findIndex(c => c === 'valeur' || c === 'actual' || c.includes('valeur'));
+      if (eIdx >= 0 && nIdx >= 0 && vIdx >= 0) {
+        headerIdx = i;
+        colEndpoint = eIdx;
+        colNom = nIdx;
+        colValeur = vIdx;
+        break;
+      }
+    }
+
+    if (headerIdx === -1) {
+      alert("Format non reconnu. Le rapport doit contenir les colonnes : Endpoint Name, Nom, Valeur.");
+      return;
+    }
+
+    // Parser les données
+    const servers = {};
+    for (let i = headerIdx + 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (row.length <= Math.max(colEndpoint, colNom, colValeur)) continue;
+      const endpoint = row[colEndpoint];
+      const nom = row[colNom];
+      const valeur = row[colValeur];
+      if (!endpoint || !nom) continue;
+
+      if (!servers[endpoint]) servers[endpoint] = { name: endpoint };
+      servers[endpoint][nom] = valeur;
+    }
+
+    const list = Object.values(servers).filter(s =>
+      s.Availability24h !== undefined || s.AvailabilityHO !== undefined
+    );
+
+    if (list.length === 0) {
+      alert("Aucun serveur trouvé dans le fichier.");
+      return;
+    }
+
+    render(list);
+  }
+
+  function toNum(v) {
+    if (v === undefined || v === null || v === '') return NaN;
+    // Les nombres peuvent être au format "99,99" ou "99.99"
+    return parseFloat(String(v).replace(',', '.'));
+  }
+
+  function render(servers) {
+    const parsed = servers.map(s => ({
+      name: s.name,
+      availHO: toNum(s.AvailabilityHO),
+      avail24: toNum(s.Availability24h),
+      downHO: toNum(s.DowntimeHoursHO),
+      down24: toNum(s.DowntimeHours24h),
+      events: parseInt(s.TotalDowntimeEvents) || 0,
+      totalHO: toNum(s.TotalHoursHO),
+      total24: toNum(s.TotalHours24h),
+      start: s.PeriodStart,
+      end: s.PeriodEnd
+    })).filter(s => !isNaN(s.availHO) || !isNaN(s.avail24));
+
+    // Cumuls de la flotte
+    const totalHO = parsed.reduce((a, b) => a + (b.totalHO || 0), 0);
+    const total24 = parsed.reduce((a, b) => a + (b.total24 || 0), 0);
+    const totalDownHO = parsed.reduce((a, b) => a + (b.downHO || 0), 0);
+    const totalDown24 = parsed.reduce((a, b) => a + (b.down24 || 0), 0);
+    const totalEvents = parsed.reduce((a, b) => a + b.events, 0);
+
+    // Calcul dispo globale : basé sur la somme totale des heures
+    // (et non sur une moyenne arithmétique des taux individuels)
+    const globalHO = totalHO > 0 ? ((totalHO - totalDownHO) / totalHO) * 100 : 0;
+    const global24 = total24 > 0 ? ((total24 - totalDown24) / total24) * 100 : 0;
+
+    // Période
+    const period = parsed.find(p => p.start && p.end);
+    const periodStr = period ? `${period.start} → ${period.end}` : '—';
+
+    // Header métriques
+    document.getElementById('global-ho').innerHTML =
+      globalHO.toFixed(2) + '<span class="unit">%</span>';
+    document.getElementById('global-24h').innerHTML =
+      global24.toFixed(2) + '<span class="unit">%</span>';
+
+    const barHO = document.getElementById('bar-ho');
+    const bar24 = document.getElementById('bar-24h');
+    barHO.style.width = Math.min(100, globalHO) + '%';
+    bar24.style.width = Math.min(100, global24) + '%';
+    barHO.className = 'status-fill ' + statusClass(globalHO);
+    bar24.className = 'status-fill ' + statusClass(global24);
+
+    const subHO = globalHO >= TARGET
+      ? `Cible respectée (≥ ${TARGET} %)`
+      : `Écart : ${(TARGET - globalHO).toFixed(2)} pts sous la cible`;
+    const sub24 = global24 >= TARGET
+      ? `Cible respectée (≥ ${TARGET} %)`
+      : `Écart : ${(TARGET - global24).toFixed(2)} pts sous la cible`;
+    document.getElementById('global-ho-sub').textContent = 'Lun–Ven · 08h–18h · ' + subHO;
+    document.getElementById('global-24h-sub').textContent = 'Incluant nuits et weekends · ' + sub24;
+
+    // Stats
+    document.getElementById('stat-count').textContent = parsed.length;
+    document.getElementById('stat-period').textContent = periodStr;
+    document.getElementById('stat-events').textContent = totalEvents;
+    document.getElementById('stat-dispho').textContent = globalHO.toFixed(2) + '%';
+    document.getElementById('stat-disp24').textContent = global24.toFixed(2) + '%';
+
+    // Tableau trié par dispo HO croissante
+    const sorted = [...parsed].sort((a, b) => (a.availHO || 100) - (b.availHO || 100));
+    const tbody = document.getElementById('tbody');
+    tbody.innerHTML = '';
+
+    sorted.forEach(s => {
+      const tr = document.createElement('tr');
+      const statusHO = s.availHO >= TARGET ? 'ok' : s.availHO >= TARGET - 1 ? 'warn' : 'bad';
+      const pillLabel = statusHO === 'ok' ? 'Conforme' : statusHO === 'warn' ? 'À surveiller' : 'Écart';
+
+      tr.innerHTML = `
+        <td class="server-name">${escapeHtml(s.name)}</td>
+        <td class="num">${isNaN(s.availHO) ? '—' : s.availHO.toFixed(2) + '%'}</td>
+        <td class="num">${isNaN(s.avail24) ? '—' : s.avail24.toFixed(2) + '%'}</td>
+        <td class="num">${isNaN(s.downHO) ? '—' : s.downHO.toFixed(2) + 'h'}</td>
+        <td class="num">${isNaN(s.down24) ? '—' : s.down24.toFixed(2) + 'h'}</td>
+        <td class="num">${s.events}</td>
+        <td><span class="pill pill-${statusHO}">${pillLabel}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    resultsEl.classList.remove('hidden');
+    emptyEl.classList.add('hidden');
+  }
+
+  function statusClass(v) {
+    if (v >= TARGET) return '';
+    if (v >= TARGET - 1) return 'warn';
+    return 'bad';
+  }
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+</script>
+</body>
+</html>
