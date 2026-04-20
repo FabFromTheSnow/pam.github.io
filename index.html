@@ -60,7 +60,7 @@
         .header p {
             font-size: 1.25rem;
             color: rgba(255, 255, 255, 0.9);
-            max-width: 600px;
+            max-width: 700px;
             margin: 0 auto;
             text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
             line-height: 1.6;
@@ -68,9 +68,9 @@
 
         .tools-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 3rem;
-            max-width: 1200px;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 2rem;
+            max-width: 1400px;
             width: 100%;
             animation: slideInUp 1s ease-out 0.3s backwards;
         }
@@ -79,12 +79,15 @@
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(20px);
             border-radius: 20px;
-            padding: 3rem;
+            padding: 2.5rem;
             box-shadow: var(--shadow-lg);
             transition: all 0.3s ease;
             border: 1px solid rgba(255, 255, 255, 0.3);
             position: relative;
             overflow: hidden;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
 
         .tool-card::before {
@@ -118,16 +121,17 @@
         }
 
         .tool-description {
-            font-size: 1.1rem;
+            font-size: 1.05rem;
             color: var(--gray);
             line-height: 1.6;
-            margin-bottom: 2.5rem;
+            margin-bottom: 2rem;
             text-align: center;
         }
 
         .tool-features {
             list-style: none;
-            margin-bottom: 2.5rem;
+            margin-bottom: 2rem;
+            flex-grow: 1;
         }
 
         .tool-features li {
@@ -151,6 +155,7 @@
             margin-right: 0.75rem;
             font-weight: bold;
             font-size: 0.75rem;
+            flex-shrink: 0;
         }
 
         .tool-button {
@@ -168,6 +173,8 @@
             text-decoration: none;
             display: block;
             text-align: center;
+            position: relative;
+            overflow: hidden;
         }
 
         .tool-button:hover {
@@ -197,7 +204,6 @@
             opacity: 0.7;
         }
 
-        /* Animations */
         @keyframes slideInDown {
             from {
                 opacity: 0;
@@ -229,31 +235,45 @@
             }
         }
 
-        /* Responsive design */
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0) rotate(0deg);
+            }
+            50% {
+                transform: translateY(-20px) rotate(10deg);
+            }
+        }
+
+        @keyframes ripple {
+            to {
+                transform: scale(4);
+                opacity: 0;
+            }
+        }
+
         @media (max-width: 768px) {
             .header h1 {
                 font-size: 2.5rem;
             }
-            
+
             .header p {
                 font-size: 1.1rem;
             }
-            
+
             .tools-grid {
                 grid-template-columns: 1fr;
                 gap: 2rem;
             }
-            
+
             .tool-card {
                 padding: 2rem;
             }
-            
+
             .container {
                 padding: 1rem;
             }
         }
 
-        /* Floating elements for visual interest */
         .background-elements {
             position: fixed;
             top: 0;
@@ -297,15 +317,6 @@
             font-size: 3.5rem;
             animation-delay: 3s;
         }
-
-        @keyframes float {
-            0%, 100% {
-                transform: translateY(0) rotate(0deg);
-            }
-            50% {
-                transform: translateY(-20px) rotate(10deg);
-            }
-        }
     </style>
 </head>
 <body>
@@ -324,7 +335,7 @@
 
         <main class="tools-grid">
             <div class="tool-card">
-                <div class="tool-icon">📊</div>
+                <div class="tool-icon">🌐</div>
                 <h2 class="tool-title">Audit des Flux Réseaux</h2>
                 <p class="tool-description">
                     Cartographie interactive des flux réseau avec analyse des risques et génération de rapports d'audit conformes ISO 27001.
@@ -337,7 +348,7 @@
                     <li>Interface intuitive avec zoom/pan</li>
                     <li>Sauvegarde automatique</li>
                 </ul>
-                <a href="flux.html" class="tool-button">
+                <a href="fluxpfsense.html" class="tool-button">
                     🚀 Accéder à l'Audit des Flux
                 </a>
             </div>
@@ -360,37 +371,51 @@
                     🚀 Accéder à la Cartographie
                 </a>
             </div>
+
+            <div class="tool-card">
+                <div class="tool-icon">📈</div>
+                <h2 class="tool-title">Visualisation de la Disponibilité</h2>
+                <p class="tool-description">
+                    Tableau de bord de visualisation de la disponibilité des services et serveurs pour le suivi opérationnel et l'audit.
+                </p>
+                <ul class="tool-features">
+                    <li>Visualisation claire de la disponibilité</li>
+                    <li>Suivi des tendances et interruptions</li>
+                    <li>Lecture rapide pour audit et pilotage</li>
+                    <li>Support au reporting mensuel</li>
+                    <li>Vue complémentaire aux flux et aux accès</li>
+                    <li>Accès direct depuis la page d'accueil</li>
+                </ul>
+                <a href="Visualisation_Dispo.html" class="tool-button">
+                    🚀 Accéder à la Visualisation
+                </a>
+            </div>
         </main>
 
         <footer class="footer">
             <p><strong>Conformité ISO 27001</strong> • Outils d'audit professionnel</p>
-            <p class="version-info">Version 2.1 • Dernière mise à jour: <span id="currentDate"></span></p>
+            <p class="version-info">Version 2.2 • Dernière mise à jour: <span id="currentDate"></span></p>
         </footer>
     </div>
 
     <script>
-        // Display current date
         document.getElementById('currentDate').textContent = new Date().toLocaleDateString('fr-FR');
 
-        // Add smooth scrolling and enhanced interactions
         document.addEventListener('DOMContentLoaded', function() {
-            // Add hover effects for cards
             const toolCards = document.querySelectorAll('.tool-card');
             toolCards.forEach(card => {
                 card.addEventListener('mouseenter', function() {
                     this.style.setProperty('--shadow-lg', '0 25px 50px -12px rgba(0, 0, 0, 0.25)');
                 });
-                
+
                 card.addEventListener('mouseleave', function() {
                     this.style.setProperty('--shadow-lg', '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)');
                 });
             });
 
-            // Add click feedback for buttons
             const toolButtons = document.querySelectorAll('.tool-button');
             toolButtons.forEach(button => {
                 button.addEventListener('click', function(e) {
-                    // Create ripple effect
                     const ripple = document.createElement('span');
                     ripple.style.cssText = `
                         position: absolute;
@@ -400,54 +425,38 @@
                         animation: ripple 0.6s linear;
                         pointer-events: none;
                     `;
-                    
+
                     const rect = this.getBoundingClientRect();
                     const size = Math.max(rect.width, rect.height);
                     ripple.style.width = ripple.style.height = size + 'px';
                     ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
                     ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
-                    
+
                     this.appendChild(ripple);
-                    
+
                     setTimeout(() => {
                         ripple.remove();
                     }, 600);
                 });
             });
-
-            // Add CSS for ripple animation
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes ripple {
-                    to {
-                        transform: scale(4);
-                        opacity: 0;
-                    }
-                }
-                .tool-button {
-                    position: relative;
-                    overflow: hidden;
-                }
-            `;
-            document.head.appendChild(style);
         });
 
-        // Add keyboard navigation
         document.addEventListener('keydown', function(e) {
             if (e.key === '1') {
-                window.location.href = 'flux.html';
+                window.location.href = 'fluxpfsense.html';
             } else if (e.key === '2') {
                 window.location.href = 'access.html';
+            } else if (e.key === '3') {
+                window.location.href = 'Visualisation_Dispo.html';
             }
         });
 
-        // Add accessibility improvements
         document.querySelectorAll('.tool-button').forEach(button => {
             button.addEventListener('focus', function() {
                 this.style.outline = '3px solid rgba(102, 126, 234, 0.5)';
                 this.style.outlineOffset = '2px';
             });
-            
+
             button.addEventListener('blur', function() {
                 this.style.outline = 'none';
             });
