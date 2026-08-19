@@ -390,11 +390,49 @@
                     🚀 Accéder à la Visualisation
                 </a>
             </div>
+
+            <div class="tool-card">
+                <div class="tool-icon">🧩</div>
+                <h2 class="tool-title">Dépendances des Actifs</h2>
+                <p class="tool-description">
+                    Cartographie des dépendances du registre d'actifs et analyse de la propagation des impacts à partir d'un fichier CSV.
+                </p>
+                <ul class="tool-features">
+                    <li>Import CSV traité dans le navigateur</li>
+                    <li>Vues par couches et en réseau</li>
+                    <li>Calcul de la profondeur des dépendances</li>
+                    <li>Identification des points de concentration</li>
+                    <li>Contrôles de cohérence du référentiel</li>
+                    <li>Export de la cartographie en SVG</li>
+                </ul>
+                <a href="Ciso-AssetView.html" class="tool-button">
+                    🚀 Accéder aux Dépendances
+                </a>
+            </div>
+
+            <div class="tool-card">
+                <div class="tool-icon">🧾</div>
+                <h2 class="tool-title">Analyse des Journaux</h2>
+                <p class="tool-description">
+                    Lecture, normalisation et exploration des journaux Windows et pfSense collectés avec Fluent Bit.
+                </p>
+                <ul class="tool-features">
+                    <li>Import NDJSON, JSONL, TXT et GZIP</li>
+                    <li>Détection des événements Windows et pfSense</li>
+                    <li>Recherche et filtres multicritères</li>
+                    <li>Déduplication et contrôle des lignes invalides</li>
+                    <li>Inspection du détail JSON des événements</li>
+                    <li>Export des résultats filtrés en NDJSON</li>
+                </ul>
+                <a href="Log-fluentbit-viewer.html" class="tool-button">
+                    🚀 Accéder à l'Analyse des Journaux
+                </a>
+            </div>
         </main>
 
         <footer class="footer">
             <p><strong>Conformité ISO 27001</strong> • Outils d'audit professionnel</p>
-            <p class="version-info">Version 2.2 • Dernière mise à jour: <span id="currentDate"></span></p>
+            <p class="version-info">Version 2.3 • Dernière mise à jour: <span id="currentDate"></span></p>
         </footer>
     </div>
 
@@ -448,6 +486,10 @@
                 window.location.href = 'access.html';
             } else if (e.key === '3') {
                 window.location.href = 'Visualisation_Dispo.html';
+            } else if (e.key === '4') {
+                window.location.href = 'Ciso-AssetView.html';
+            } else if (e.key === '5') {
+                window.location.href = 'Log-fluentbit-viewer.html';
             }
         });
 
@@ -463,4 +505,4 @@
         });
     </script>
 </body>
-</html>
+</html
